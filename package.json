@@ -15,6 +15,7 @@
     "factory": "tsx src/ops/cli.ts",
     "doctor": "tsx src/ops/cli.ts doctor",
     "setup:local": "bash scripts/setup-local.sh",
+    "setup:local:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-local.ps1",
     "local:up": "docker compose -f docker-compose.local.yml up -d ollama kokoro",
     "local:down": "docker compose -f docker-compose.local.yml down",
     "stack:up": "docker compose up -d --build",

@@ -183,7 +183,26 @@ npm run factory -- create --topic "curiosidades de la historia" --local
 plano + Ken Burns, lo más barato). Ejemplo listo: `src/config/historia-local.yaml`.
 Workflows de ComfyUI editables en `comfyui-workflows/`.
 
-### Operación 24/7 (un solo comando)
+#### Windows
+
+Funciona en Windows. El núcleo (CLI, pipeline, `run`/`create`/`doctor`/`validate`/
+`genesis`/`feedback`) es Node/TS puro y multiplataforma — `npm install` + `npm run factory`
+y listo. Notas:
+
+- **Setup local:** usa el script PowerShell en vez del de bash:
+  ```powershell
+  npm run setup:local:win          # o: powershell -File scripts/setup-local.ps1 -Model qwen3
+  ```
+  (`npm run setup:local`, en bash, requiere WSL o Git Bash.)
+- **Docker / 24/7:** `docker compose up -d --build` funciona igual con Docker Desktop.
+- **Render real:** instala **ffmpeg** y ponlo en el `PATH` (p.ej. `winget install Gyan.FFmpeg`).
+  Sin ffmpeg, el render cae a *manifest* (el resto del pipeline corre igual).
+- **Modelos locales:** Ollama tiene instalador nativo para Windows; ComfyUI también corre
+  en Windows (mejor con GPU NVIDIA).
+- **Programación 24/7 sin Docker:** además del worker, puedes disparar `npm run factory -- run <id>`
+  desde el **Programador de tareas** de Windows.
+
+## Operación 24/7 (un solo comando)
 
 Stack completo en Docker — **worker (BullMQ) + Postgres + Redis**, con perfiles opcionales
 para la IA local:

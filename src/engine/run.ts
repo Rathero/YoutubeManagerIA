@@ -1,0 +1,71 @@
+import { randomUUID } from "node:crypto";
+import { getAdapter } from "../adapters/registry.js";
+import { Orchestrator, type RunOutcome } from "../core/orchestrator/orchestrator.js";
+import type { ChannelDefinition, RunContext } from "../core/types/index.js";
+import { createLogger } from "../ops/logger.js";
+import { JsonStore, toRunRecord, type Store } from "../storage/store.js";
+import { getLlmClient } from "./llm/client.js";
+import { createIngestStage } from "./ingest/index.js";
+import { createComputeStage } from "./compute/index.js";
+import { createScriptStage } from "./script/index.js";
+import { createVoiceStage } from "./voice/index.js";
+import { createRenderStage } from "./render/index.js";
+import { createMetadataStage } from "./metadata/index.js";
+import { createQaStage } from "./qa/index.js";
+import { createPublishStage } from "./publish/index.js";
+import { createRecordStage } from "./record/index.js";
+
+export interface RunOptions {
+  date?: string; // ISO YYYY-MM-DD; defaults to today
+  now?: Date;
+  dryRun?: boolean;
+  store?: Store;
+}
+
+function isoToday(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/**
+ * Assembles the full Engine pipeline for a channel and runs one cycle.
+ * The stage list IS the pipeline from section 6 of the brief, in order.
+ */
+export async function runChannel(channel: ChannelDefinition, opts: RunOptions = {}): Promise<RunOutcome> {
+  const now = opts.now ?? new Date();
+  const date = opts.date ?? isoToday(now);
+  const store = opts.store ?? new JsonStore();
+  const adapter = getAdapter(channel.data.adapter);
+  const llm = getLlmClient();
+
+  const ctx: RunContext = {
+    runId: randomUUID(),
+    channel,
+    date,
+    now,
+    dryRun: opts.dryRun ?? false,
+    stageRecords: [],
+    log: createLogger({ runId: "run", channelId: channel.id, date }),
+  };
+
+  const orchestrator = new Orchestrator([
+    createIngestStage(adapter),
+    createComputeStage(adapter),
+    createScriptStage(llm),
+    createVoiceStage(),
+    createRenderStage(),
+    createMetadataStage(),
+    createQaStage(),
+    createPublishStage(store),
+    createRecordStage(store),
+  ]);
+
+  const outcome = await orchestrator.run(ctx);
+
+  // Persist a record even on skip/failure for traceability.
+  if (outcome.status === "skipped") {
+    await store.saveRun(toRunRecord(ctx, "skipped", outcome.reason));
+  } else if (outcome.status === "failed") {
+    await store.saveRun(toRunRecord(ctx, "failed", outcome.error.message));
+  }
+  return outcome;
+}

@@ -1,0 +1,62 @@
+{
+  "source": { "name": "preciodelaluz.org (fixture)", "url": "https://www.preciodelaluz.org/" },
+  "avg30d": 0.115,
+  "today": {
+    "date": "2026-06-20",
+    "hours": [
+      { "hour": 0, "price": 0.092 },
+      { "hour": 1, "price": 0.085 },
+      { "hour": 2, "price": 0.081 },
+      { "hour": 3, "price": 0.079 },
+      { "hour": 4, "price": 0.08 },
+      { "hour": 5, "price": 0.084 },
+      { "hour": 6, "price": 0.097 },
+      { "hour": 7, "price": 0.118 },
+      { "hour": 8, "price": 0.131 },
+      { "hour": 9, "price": 0.142 },
+      { "hour": 10, "price": 0.138 },
+      { "hour": 11, "price": 0.129 },
+      { "hour": 12, "price": 0.121 },
+      { "hour": 13, "price": 0.116 },
+      { "hour": 14, "price": 0.108 },
+      { "hour": 15, "price": 0.104 },
+      { "hour": 16, "price": 0.111 },
+      { "hour": 17, "price": 0.124 },
+      { "hour": 18, "price": 0.149 },
+      { "hour": 19, "price": 0.172 },
+      { "hour": 20, "price": 0.188 },
+      { "hour": 21, "price": 0.181 },
+      { "hour": 22, "price": 0.152 },
+      { "hour": 23, "price": 0.118 }
+    ]
+  },
+  "tomorrow": {
+    "date": "2026-06-21",
+    "hours": [
+      { "hour": 0, "price": 0.078 },
+      { "hour": 1, "price": 0.071 },
+      { "hour": 2, "price": 0.066 },
+      { "hour": 3, "price": 0.063 },
+      { "hour": 4, "price": 0.064 },
+      { "hour": 5, "price": 0.069 },
+      { "hour": 6, "price": 0.082 },
+      { "hour": 7, "price": 0.101 },
+      { "hour": 8, "price": 0.114 },
+      { "hour": 9, "price": 0.123 },
+      { "hour": 10, "price": 0.118 },
+      { "hour": 11, "price": 0.109 },
+      { "hour": 12, "price": 0.101 },
+      { "hour": 13, "price": 0.096 },
+      { "hour": 14, "price": 0.089 },
+      { "hour": 15, "price": 0.086 },
+      { "hour": 16, "price": 0.093 },
+      { "hour": 17, "price": 0.107 },
+      { "hour": 18, "price": 0.128 },
+      { "hour": 19, "price": 0.146 },
+      { "hour": 20, "price": 0.159 },
+      { "hour": 21, "price": 0.153 },
+      { "hour": 22, "price": 0.131 },
+      { "hour": 23, "price": 0.101 }
+    ]
+  }
+}

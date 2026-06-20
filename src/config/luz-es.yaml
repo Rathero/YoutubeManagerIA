@@ -1,0 +1,134 @@
+id: luz-es
+status: active
+version: 1
+
+identity:
+  name: "Precio de la Luz Hoy"
+  language: es-ES
+  region: ES
+  brand:
+    palette:
+      cheap: "#16a34a"
+      mid: "#f59e0b"
+      expensive: "#dc2626"
+      bg: "#0b1220"
+      fg: "#ffffff"
+      accent: "#3b82f6"
+    fonts:
+      heading: "Inter"
+      body: "Inter"
+    logo_asset: "assets/luz-es/logo.svg"
+    visual_template: "data-card-v1"
+  voice_persona:
+    description: "Cercano, claro, sin humo. Va al grano. Tutea."
+    do: ["dar el dato ya", "una recomendación accionable"]
+    dont: ["clickbait", "alarmismo", "promesas de ahorro irreales"]
+
+niche:
+  topic: "precio diario de la electricidad PVPC en España"
+  audience: "hogares en tarifa regulada que quieren ahorrar planificando consumos"
+  value_proposition: "saber cada tarde a qué hora consumir mañana sale más barato"
+  monetization:
+    primary: affiliate
+    affiliate_verticals:
+      - "comparadores tarifas"
+      - "placas solares"
+      - "baterias"
+      - "cargadores VE"
+      - "enchufes inteligentes"
+    product_idea: "newsletter/bot con aviso personalizado de horas baratas"
+
+data:
+  adapter: "luz"
+  freshness:
+    type: daily_dayahead
+    available_after: "20:00 Europe/Madrid"
+    confirm_field: "tomorrow_present"
+  config:
+    # Default to the bundled fixture so `factory run` works offline.
+    # Switch to source: preciodelaluz (no token) or esios (token) for production.
+    source: "fixture"
+    fixturePath: "src/adapters/luz/fixtures/sample.json"
+    zone: "PCB"
+    baselineEurKwh: 0.115
+    appliances:
+      - { key: "lavadora", duration_h: 2 }
+      - { key: "coche_ve", duration_h: 7, prefer: "night" }
+      - { key: "termo", duration_h: 1 }
+
+formats:
+  - kind: short
+    enabled: true
+    target_seconds: 40
+    structure: ["hook", "dato_clave", "franjas_recomendadas", "comparacion", "cta"]
+  - kind: long
+    enabled: true
+    target_seconds: 180
+    structure: ["intro", "grafico_24h", "top_baratas_caras", "contexto_porque", "consejo", "cta"]
+  - kind: weekly
+    enabled: false
+    schedule: "SUN 19:00"
+    structure: ["resumen_semana", "dia_mas_barato_caro", "tendencia", "preview"]
+
+script:
+  prompt_template: "src/templates/luz/script.md"
+  max_words:
+    short: 110
+    long: 420
+  language_rules: "es-ES, frases cortas, números con coma decimal"
+
+voice:
+  provider: stub
+  voice_id: "es-ES-voice"
+  speed: 1.05
+
+render:
+  engine: ffmpeg
+  template: "data-card-v1"
+  aspect_ratios: ["9:16", "16:9"]
+  music:
+    enabled: false
+    library: "licensed/lofi"
+    volume_db: -22
+
+platforms:
+  - id: youtube
+    enabled: true
+    account_ref: "secrets://youtube/luz-es"
+    posts: ["short", "long"]
+    publish_times: { short: "21:30", long: "21:45" }
+    mode: assisted
+  - id: tiktok
+    enabled: true
+    account_ref: "secrets://tiktok/luz-es"
+    posts: ["short"]
+    publish_times: { short: "21:35" }
+    mode: assisted
+  - id: instagram
+    enabled: true
+    account_ref: "secrets://instagram/luz-es"
+    posts: ["short"]
+    publish_times: { short: "21:40" }
+    mode: assisted
+
+distribution_own:
+  newsletter:
+    enabled: false
+    provider: "buttondown"
+  telegram_bot:
+    enabled: false
+
+schedule:
+  timezone: "Europe/Madrid"
+  trigger:
+    type: time_with_data_gate
+    at: "20:30"
+    retry_every_min: 10
+    give_up_at: "23:00"
+
+kpis:
+  targets:
+    short_retention_pct: 50
+    sub_per_view_pct: 1.5
+    newsletter_signups_week: 25
+  review_after_days: 28

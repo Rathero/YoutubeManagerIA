@@ -1,0 +1,56 @@
+# Local AI stack for Channel Factory — $0 inference.
+# Brings up an OpenAI-compatible LLM (Ollama) and TTS (Kokoro). ComfyUI (image/video)
+# is GPU-heavy and environment-specific, so it's an opt-in profile.
+#
+#   docker compose -f docker-compose.local.yml up -d ollama kokoro
+#   docker compose -f docker-compose.local.yml --profile gpu up -d   # + ComfyUI
+#
+# Then point the factory at them via .env (already the defaults):
+#   FACTORY_LOCAL_LLM_URL=http://localhost:11434/v1
+#   FACTORY_LOCAL_TTS_URL=http://localhost:8880/v1
+#   FACTORY_COMFYUI_URL=http://localhost:8188
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: cf-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+    # For NVIDIA GPUs, uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - { driver: nvidia, count: all, capabilities: [gpu] }
+
+  kokoro:
+    # OpenAI-compatible Kokoro TTS server (/v1/audio/speech). CPU image runs anywhere.
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: cf-kokoro
+    ports:
+      - "8880:8880"
+    restart: unless-stopped
+
+  comfyui:
+    # Image (FLUX/SDXL) + video (Wan/LTX/Hunyuan). Needs a GPU + model weights.
+    # Replace with your preferred ComfyUI image/build; this is a starting point.
+    image: yanwk/comfyui-boot:latest
+    container_name: cf-comfyui
+    profiles: ["gpu"]
+    ports:
+      - "8188:8188"
+    volumes:
+      - comfyui:/root
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - { driver: nvidia, count: all, capabilities: [gpu] }
+
+volumes:
+  ollama:
+  comfyui:

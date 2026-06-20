@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getLlmClient } from "./llm/client.js";
+import { getLlmClient, resolveLlmClient } from "./llm/client.js";
 import { getImageProvider } from "./image/provider.js";
 import { getTtsProvider } from "./voice/provider.js";
 import { getVideoProvider } from "./video/registry.js";
@@ -44,5 +44,22 @@ describe("local provider selection ($0 stack)", () => {
     const { provider, fellBack } = getVideoProvider("comfyui", { workflow: "comfyui-workflows/wan-video.json" });
     expect(provider.name).toBe("comfyui");
     expect(fellBack).toBe(false);
+  });
+
+  it("resolveLlmClient honors an explicit local provider without probing", async () => {
+    const c = await resolveLlmClient({ name: "local" });
+    expect(c?.name).toBe("local");
+  });
+
+  it("resolveLlmClient auto returns null when no local server and no cloud key", async () => {
+    process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENAI_API_KEY = "";
+    process.env.GEMINI_API_KEY = "";
+    process.env.GOOGLE_API_KEY = "";
+    // No local configured (default URL points at a port with nothing listening).
+    delete process.env.FACTORY_LOCAL_LLM_URL;
+    delete process.env.FACTORY_LOCAL_LLM;
+    const c = await resolveLlmClient({ name: "auto" });
+    expect(c).toBeNull();
   });
 });

@@ -94,6 +94,8 @@ export interface RunContext {
   stageRecords: StageRecord[];
   /** structured logger bound to this run. */
   log: (level: "debug" | "info" | "warn" | "error", msg: string, extra?: Record<string, unknown>) => void;
+  /** Resolved text/LLM client for this run (local-first auto), shared by stages + adapters. */
+  llm?: import("../../engine/llm/client.js").LlmClient | null;
 }
 
 export type RawData = unknown;

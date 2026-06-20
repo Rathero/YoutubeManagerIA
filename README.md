@@ -106,8 +106,13 @@ npm run factory -- validate luz-es
 npm run factory -- run luz-es --date 2026-06-21 --dry-run   # no publica
 npm run factory -- run luz-es --date 2026-06-21             # deja bundles "1-toque"
 
+# Stack local gratis: setup en 1 comando + diagnóstico
+npm run setup:local
+npm run doctor
+
 # Crear un canal SIN código (guiado): describe la temática y te lleva al modelo+estilo
 npm run factory -- create --topic "curiosidades del espacio"
+npm run factory -- create --topic "documentales de naturaleza" --local   # stack 100% local $0
 npm run factory -- create --topic "precio del Bitcoin hoy" --yes   # acepta recomendaciones
 
 # FASE A (alternativa analítica): informe de estrategia + viability + draft
@@ -159,16 +164,24 @@ categoría, integrados detrás de las mismas interfaces (caen a stub si el servi
 - **Imagen:** **FLUX** / **SDXL** vía **ComfyUI**.
 - **Vídeo:** **Wan 2.2** / **LTX-Video** / **HunyuanVideo** vía **ComfyUI**.
 
-Crea un canal totalmente local de un tiro:
+**Setup local en 1 comando** (levanta Ollama + Kokoro vía Docker, descarga el modelo,
+configura `.env` y diagnostica):
 
 ```bash
+npm run setup:local              # o: npm run setup:local -- qwen3
+npm run doctor                   # ¿qué servidores locales / claves cloud hay activos?
 npm run factory -- create --topic "curiosidades de la historia" --local
 ```
 
-Esto configura texto=Ollama, voz=Kokoro y **modo `images`** (1 imagen IA por plano +
-Ken Burns, lo más barato y local-friendly). Ejemplo listo: `src/config/historia-local.yaml`.
-Las URLs locales se ajustan en `.env` (`FACTORY_LOCAL_LLM_URL`, `FACTORY_LOCAL_TTS_URL`,
-`FACTORY_COMFYUI_URL`). Workflows de ComfyUI editables en `comfyui-workflows/`.
+- `setup:local` usa `docker-compose.local.yml` (Ollama :11434 + Kokoro :8880; ComfyUI es
+  un *profile* `gpu` opcional). Si no tienes Docker, te indica cómo instalar cada pieza.
+- `doctor` sondea LLM/TTS/ComfyUI + ffmpeg + claves cloud y te dice qué se usará.
+- **Auto local-first:** con `script.provider.name: auto`, si detecta un LLM local levantado
+  lo usa **antes que el cloud** para ahorrar (invertible con `FACTORY_PREFER_CLOUD=1`).
+
+`create --local` configura texto=Ollama, voz=Kokoro y **modo `images`** (1 imagen IA por
+plano + Ken Burns, lo más barato). Ejemplo listo: `src/config/historia-local.yaml`.
+Workflows de ComfyUI editables en `comfyui-workflows/`.
 
 ### Vídeo generativo con IA + estilos
 

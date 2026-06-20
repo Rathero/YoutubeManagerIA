@@ -146,3 +146,21 @@ export function getLlmClient(config?: LlmProviderConfig): LlmClient | null {
   if (localEnabled()) return new LocalLlmClient(model, config?.base);
   return null;
 }
+
+/**
+ * Async, reachability-aware resolver. For "auto" it is LOCAL-FIRST to save money:
+ * if a local LLM server is up it uses it, regardless of cloud keys (override with
+ * FACTORY_PREFER_CLOUD=1). Falls back to cloud keys, then local-if-enabled, then null.
+ * Explicit providers behave exactly like getLlmClient().
+ */
+export async function resolveLlmClient(config?: LlmProviderConfig): Promise<LlmClient | null> {
+  const name = config?.name ?? "auto";
+  if (name !== "auto") return getLlmClient(config);
+
+  const preferCloud = process.env.FACTORY_PREFER_CLOUD === "1";
+  if (!preferCloud) {
+    const { isLocalLlmReachable } = await import("../../ops/doctor.js");
+    if (await isLocalLlmReachable()) return new LocalLlmClient(config?.model, config?.base);
+  }
+  return getLlmClient(config);
+}

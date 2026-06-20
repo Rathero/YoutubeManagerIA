@@ -118,6 +118,14 @@ program
   });
 
 program
+  .command("doctor")
+  .description("Check which local servers (LLM/TTS/ComfyUI) and cloud keys are available")
+  .action(async () => {
+    const { runDoctor } = await import("./doctor.js");
+    await runDoctor();
+  });
+
+program
   .command("providers")
   .description("List available AI providers per category (text / voice / video)")
   .action(() => {

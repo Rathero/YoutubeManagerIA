@@ -105,7 +105,8 @@ class GenerativeAdapter implements NicheAdapter {
   async analyze(raw: RawData, ctx: RunContext): Promise<ContentPayload> {
     const seed = raw as GenSeed;
     const cfg = (ctx.channel.data.config ?? {}) as GenerativeConfig;
-    const client = getLlmClient(ctx.channel.script.provider);
+    // Reuse the run-resolved client (local-first auto); resolve if absent (e.g. unit tests).
+    const client = ctx.llm !== undefined ? ctx.llm : getLlmClient(ctx.channel.script.provider);
     if (!client) return fallbackPayload(ctx, seed);
 
     let parsed: any;

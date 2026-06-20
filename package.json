@@ -13,6 +13,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "factory": "tsx src/ops/cli.ts",
+    "doctor": "tsx src/ops/cli.ts doctor",
+    "setup:local": "bash scripts/setup-local.sh",
+    "local:up": "docker compose -f docker-compose.local.yml up -d ollama kokoro",
+    "local:down": "docker compose -f docker-compose.local.yml down",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

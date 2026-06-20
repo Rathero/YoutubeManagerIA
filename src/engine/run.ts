@@ -5,7 +5,7 @@ import type { ChannelDefinition, RunContext } from "../core/types/index.js";
 import { createLogger } from "../ops/logger.js";
 import { toRunRecord, type Store } from "../storage/store.js";
 import { getStore } from "../storage/index.js";
-import { getLlmClient } from "./llm/client.js";
+import { resolveLlmClient } from "./llm/client.js";
 import { createIngestStage } from "./ingest/index.js";
 import { createComputeStage } from "./compute/index.js";
 import { createScriptStage } from "./script/index.js";
@@ -36,7 +36,7 @@ export async function runChannel(channel: ChannelDefinition, opts: RunOptions = 
   const date = opts.date ?? isoToday(now);
   const store = opts.store ?? (await getStore());
   const adapter = getAdapter(channel.data.adapter);
-  const llm = getLlmClient(channel.script.provider);
+  const llm = await resolveLlmClient(channel.script.provider);
 
   const ctx: RunContext = {
     runId: randomUUID(),
@@ -46,6 +46,7 @@ export async function runChannel(channel: ChannelDefinition, opts: RunOptions = 
     dryRun: opts.dryRun ?? false,
     stageRecords: [],
     log: createLogger({ runId: "run", channelId: channel.id, date }),
+    llm,
   };
 
   const orchestrator = new Orchestrator([

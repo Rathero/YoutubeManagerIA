@@ -11,6 +11,7 @@ import { createComputeStage } from "./compute/index.js";
 import { createScriptStage } from "./script/index.js";
 import { createVoiceStage } from "./voice/index.js";
 import { createCaptionsStage } from "./captions/index.js";
+import { createModerationStage } from "./moderation/index.js";
 import { createRenderStage } from "./render/index.js";
 import { createThumbnailStage } from "./thumbnail/index.js";
 import { createMetadataStage } from "./metadata/index.js";
@@ -55,6 +56,7 @@ export async function runChannel(channel: ChannelDefinition, opts: RunOptions = 
     createIngestStage(adapter),
     createComputeStage(adapter),
     createScriptStage(llm),
+    createModerationStage(),
     createVoiceStage(),
     createCaptionsStage(),
     createRenderStage(llm),

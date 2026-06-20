@@ -280,6 +280,20 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
   falló, nº de salidas) desde el store (JSON o Postgres).
 - **CI:** `.github/workflows/ci.yml` corre typecheck + tests + build + un *smoke* del CLI en
   **Ubuntu y Windows** (Node 20 y 22) en cada push.
+- **Subtítulos exactos (Whisper):** `render.captions.align: whisper` alinea con el audio real
+  vía un endpoint de transcripción (local faster-whisper/Speaches u OpenAI); si no, proporcional.
+- **Música de fondo:** `render.music.enabled` + `track` mezcla una pista licenciada bajo la voz
+  (post-pass ffmpeg a `volume_db`).
+- **Moderación:** etapa `moderation` (blocklist determinista + LLM opcional) **bloquea** la
+  publicación de contenido prohibido antes de gastar en media (`moderation` en la config).
+- **A/B de títulos:** `ab_testing.titles` rota variantes de título por día; el feedback
+  (`factory feedback`) atribuye cuál rinde más.
+- **Distribución propia:** `distribution_own.newsletter`/`telegram_bot` emite una edición en
+  texto/Markdown del payload (a fichero siempre; a Buttondown/Telegram si hay credenciales).
+- **Multi-idioma:** `factory localize <canal> --to en,pt,fr` deriva canales hijos traducidos
+  (LLM si hay clave) listos para activar.
+- **Coste:** `factory estimate <canal>` calcula el gasto mensual por proveedor (local = $0).
+- **YouTube auto:** sube además **miniatura** y **subtítulos** tras el vídeo (best-effort).
 
 ---
 

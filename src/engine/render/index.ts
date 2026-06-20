@@ -5,6 +5,7 @@ import { runDir } from "../../storage/paths.js";
 import type { LlmClient } from "../llm/client.js";
 import { getRenderEngine } from "./provider.js";
 import { renderGenerative } from "./generative.js";
+import { mixMusicInto } from "./music.js";
 
 /** Map a format to the aspect ratios it should be rendered in. */
 function aspectsForFormat(format: string, channelAspects: string[]): string[] {
@@ -79,6 +80,16 @@ export function createRenderStage(llm: LlmClient | null): Stage {
           });
         }
       }
+      // Background music (post-pass; no-op without ffmpeg/track).
+      const music = ctx.channel.render.music;
+      if (music.enabled && music.track) {
+        for (const asset of rendered) {
+          if (asset.mimeType !== "video/mp4") continue;
+          const mixed = await mixMusicInto(asset.path, music.track, music.volume_db);
+          if (mixed) ctx.log("info", "music mixed", { format: asset.format });
+        }
+      }
+
       ctx.rendered = rendered;
       ctx.log("info", "render done", { mode: generative ? "generative" : "data_card", assets: rendered.length });
     },

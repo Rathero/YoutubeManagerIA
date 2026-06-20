@@ -49,6 +49,17 @@ export class YouTubePublisher implements Publisher {
         tags: meta.hashtags.map((h) => h.replace(/^#/, "")),
         isShort: Boolean(meta.extra?.isShort),
       });
+
+      // Best-effort extras: custom thumbnail + subtitle track. Never fail the publish.
+      const thumb = meta.extra?.thumbnailPath as string | undefined;
+      if (thumb && /\.(png|jpe?g)$/i.test(thumb)) {
+        await this.setThumbnail(token!, externalId, thumb).catch(() => undefined);
+      }
+      const srt = meta.extra?.captionsPath as string | undefined;
+      if (srt && srt.endsWith(".srt")) {
+        await this.insertCaption(token!, externalId, srt).catch(() => undefined);
+      }
+
       return {
         platform: "youtube",
         format: meta.format,
@@ -59,6 +70,34 @@ export class YouTubePublisher implements Publisher {
     } catch (err) {
       return { platform: "youtube", format: meta.format, status: "failed", message: (err as Error).message };
     }
+  }
+
+  /** Set a custom thumbnail (thumbnails.set). */
+  private async setThumbnail(token: string, videoId: string, imagePath: string): Promise<void> {
+    const body = await readFile(imagePath);
+    const type = imagePath.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
+    const res = await fetch(`https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${videoId}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": type, "content-length": String(body.byteLength) },
+      body,
+    });
+    if (!res.ok) throw new Error(`thumbnails.set ${res.status}`);
+  }
+
+  /** Insert an SRT subtitle track (captions.insert, multipart/related). */
+  private async insertCaption(token: string, videoId: string, srtPath: string): Promise<void> {
+    const srt = await readFile(srtPath, "utf8");
+    const meta = JSON.stringify({ snippet: { videoId, language: "es", name: "Subtítulos", isDraft: false } });
+    const boundary = "cf-" + Math.random().toString(36).slice(2);
+    const parts =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
+      `--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n${srt}\r\n--${boundary}--\r\n`;
+    const res = await fetch("https://www.googleapis.com/upload/youtube/v3/captions?part=snippet&uploadType=multipart", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": `multipart/related; boundary=${boundary}` },
+      body: parts,
+    });
+    if (!res.ok) throw new Error(`captions.insert ${res.status}`);
   }
 
   /** Minimal Data API v3 resumable upload. */

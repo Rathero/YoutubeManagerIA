@@ -1,6 +1,7 @@
 import type { Stage } from "../../core/pipeline/stage.js";
 import type { PublishResult, RenderedAsset } from "../../core/types/index.js";
 import { getPublisher } from "../../distribution/registry.js";
+import { emitOwnDistribution } from "../../distribution/own/newsletter.js";
 import type { Store } from "../../storage/store.js";
 
 /** Pick the best rendered asset for a platform+format (right aspect ratio). */
@@ -48,6 +49,12 @@ export function createPublishStage(store: Store): Stage {
           });
           results.push(res);
         }
+      }
+
+      // Own distribution (newsletter / Telegram) — independent of the algorithm.
+      if (ctx.payload && ctx.channel.distribution_own) {
+        const own = await emitOwnDistribution(ctx.channel, ctx.date, ctx.payload, ctx.dryRun);
+        results.push(...own);
       }
 
       ctx.publications = results;

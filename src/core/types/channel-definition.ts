@@ -191,17 +191,21 @@ const RenderSchema = z.object({
     .object({
       enabled: z.boolean().default(false),
       library: z.string().optional(),
-      volume_db: z.number().optional(),
+      /** Path to a licensed background track to mix under the narration. */
+      track: z.string().optional(),
+      volume_db: z.number().default(-22),
     })
-    .default({ enabled: false }),
+    .default({ enabled: false, volume_db: -22 }),
   /** Burned-in / sidecar captions. Great for retention on silent-autoplay shorts. */
   captions: z
     .object({
       enabled: z.boolean().default(true),
       burn_in: z.boolean().default(false),
       max_chars_per_line: z.number().int().positive().default(38),
+      /** proportional = timed by word share; whisper = align to audio via ASR endpoint. */
+      align: z.enum(["proportional", "whisper"]).default("proportional"),
     })
-    .default({ enabled: true, burn_in: false, max_chars_per_line: 38 }),
+    .default({ enabled: true, burn_in: false, max_chars_per_line: 38, align: "proportional" }),
   /** Auto-generated thumbnail per video (CTR). */
   thumbnails: z
     .object({
@@ -264,6 +268,21 @@ export const ChannelDefinitionSchema = z.object({
     .optional(),
   schedule: ScheduleSchema,
   kpis: KpisSchema.optional(),
+  /** Content moderation gate (deterministic blocklist + optional LLM). */
+  moderation: z
+    .object({
+      enabled: z.boolean().default(true),
+      blocklist: z.array(z.string()).default([]),
+      /** Also run an LLM/OpenAI moderation pass when a client/key is available. */
+      llm: z.boolean().default(false),
+    })
+    .default({ enabled: true, blocklist: [], llm: false }),
+  /** A/B testing of titles/thumbnails (rotated per run, attributed via feedback). */
+  ab_testing: z
+    .object({
+      titles: z.boolean().default(true),
+    })
+    .default({ titles: true }),
 });
 
 export type ChannelDefinition = z.infer<typeof ChannelDefinitionSchema>;

@@ -52,7 +52,7 @@ export interface PlatformMeta {
 }
 
 export interface PublishResult {
-  platform: "youtube" | "tiktok" | "instagram";
+  platform: "youtube" | "tiktok" | "instagram" | "newsletter" | "telegram";
   format: FormatKind;
   status: "published" | "queued_assisted" | "skipped" | "failed";
   externalId?: string;
@@ -67,6 +67,7 @@ export type StageName =
   | "script"
   | "voice"
   | "captions"
+  | "moderation"
   | "render"
   | "thumbnail"
   | "metadata"
@@ -106,6 +107,7 @@ export interface RunContext {
   thumbnails?: ThumbnailAsset[];
   metadata?: PlatformMeta[];
   qa?: { passed: boolean; failures: string[]; warnings: string[] };
+  moderation?: { flagged: boolean; reasons: string[] };
   publications?: PublishResult[];
 
   stageRecords: StageRecord[];

@@ -14,6 +14,8 @@ export interface PublicationMetric {
   publishHour: number;
   /** Controllable: the hook/day classification (e.g. "barato" | "caro"). */
   classification?: string;
+  /** Controllable: the A/B title variant id (e.g. "A" | "B" | "C"). */
+  titleVariant?: string;
   views: number;
   retentionPct?: number;
   subs?: number;
@@ -27,7 +29,7 @@ export interface MetricsSource {
 }
 
 export interface FeedbackSignal {
-  variable: "publish_time" | "format" | "hook_style";
+  variable: "publish_time" | "format" | "hook_style" | "title";
   recommendation: string;
   /** 0..1; grows with sample size and effect size. */
   confidence: number;
@@ -114,6 +116,26 @@ export function deriveFeedback(metrics: PublicationMetric[]): FeedbackSignal[] {
         signals.push({
           variable: "hook_style",
           recommendation: `Los días "${best.cls}" rinden ~${Math.round(lift * 100)}% más. Reforzar ese ángulo en el hook del guión.`,
+          confidence: confidence(best.n, lift),
+        });
+      }
+    }
+  }
+
+  // 4) Best A/B title variant (by views).
+  const byTitle = groupBy(metrics.filter((m) => m.titleVariant), (m) => m.titleVariant!);
+  if (byTitle.size > 1) {
+    let best: { id: string; avg: number; n: number } | null = null;
+    for (const [id, items] of byTitle) {
+      const avg = mean(items.map((m) => m.views));
+      if (!best || avg > best.avg) best = { id, avg, n: items.length };
+    }
+    if (best) {
+      const lift = (best.avg - overallViews) / overallViews;
+      if (lift > 0.1) {
+        signals.push({
+          variable: "title",
+          recommendation: `La variante de título "${best.id}" rinde ~${Math.round(lift * 100)}% más. Favorecerla en el A/B.`,
           confidence: confidence(best.n, lift),
         });
       }

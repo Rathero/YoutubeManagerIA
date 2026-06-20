@@ -142,6 +142,38 @@ program
   });
 
 program
+  .command("estimate")
+  .description("Estimate monthly AI cost for a channel by provider")
+  .argument("<channel>", "channel id or path")
+  .action(async (channel: string) => {
+    const def = await loadChannelDefinition(resolveConfig(channel));
+    const { estimateChannel, formatEstimate } = await import("../ops/estimate.js");
+    console.log(formatEstimate(def, estimateChannel(def)));
+  });
+
+program
+  .command("localize")
+  .description("Derive localized child channels from a base channel (multi-idioma)")
+  .argument("<channel>", "base channel id or path")
+  .requiredOption("--to <langs>", "comma-separated language codes, e.g. en,pt,fr")
+  .option("-o, --out <dir>", "output directory", "src/config")
+  .action(async (channel: string, opts: { to: string; out: string }) => {
+    const base = await loadChannelDefinition(resolveConfig(channel));
+    const { localizeChannel } = await import("../genesis/localize.js");
+    const { getLlmClient } = await import("../engine/llm/client.js");
+    const client = getLlmClient(base.script.provider);
+    const dir = resolve(process.cwd(), opts.out);
+    await mkdir(dir, { recursive: true });
+    for (const lang of opts.to.split(",").map((s) => s.trim()).filter(Boolean)) {
+      const child = await localizeChannel(base, lang, client);
+      const path = resolve(dir, `${child.id}.yaml`);
+      await writeFile(path, toYaml(child));
+      console.log(`  ${lang} → ${child.id}  (${path})`);
+    }
+    console.log("\nRevisa los hijos (status: draft) y actívalos cuando quieras.");
+  });
+
+program
   .command("doctor")
   .description("Check which local servers (LLM/TTS/ComfyUI) and cloud keys are available")
   .action(async () => {

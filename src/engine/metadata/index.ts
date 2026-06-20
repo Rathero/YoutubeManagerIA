@@ -20,6 +20,35 @@ function slugHashtag(s: string): string {
   );
 }
 
+function dayIndexFromIso(date: string): number {
+  const t = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(t) ? Math.floor(t / 86400000) : 0;
+}
+
+/** Deterministic title variants for A/B rotation. */
+export function titleVariants(headline: string, channelName: string, isShort: boolean): { id: string; title: string }[] {
+  const suffix = isShort ? " #shorts" : ` | ${channelName}`;
+  const q = headline.replace(/[.!]$/, "");
+  return [
+    { id: "A", title: `${headline}${suffix}` },
+    { id: "B", title: `¿${q}?${suffix}` },
+    { id: "C", title: `${headline} 👀${suffix}` },
+  ];
+}
+
+/** Pick a title variant for this run (rotates by date when A/B is on). */
+export function pickTitle(
+  headline: string,
+  channelName: string,
+  isShort: boolean,
+  date: string,
+  abEnabled: boolean,
+): { id: string; title: string } {
+  const variants = titleVariants(headline, channelName, isShort);
+  const idx = abEnabled ? dayIndexFromIso(date) % variants.length : 0;
+  return variants[idx]!;
+}
+
 function baseHashtags(channel: ChannelDefinition): string[] {
   const tags = new Set<string>();
   tags.add(slugHashtag(channel.identity.name));
@@ -38,6 +67,7 @@ function buildMeta(
   payload: ContentPayload,
   platform: PlatformMeta["platform"],
   format: FormatKind,
+  date: string,
 ): PlatformMeta {
   const base = baseHashtags(channel);
   const cta = payload.cta ?? "";
@@ -45,11 +75,9 @@ function buildMeta(
   const aiDisclosure = "\n\nContenido con voz/edición generada por IA.";
 
   if (platform === "youtube") {
-    // SEO-leaning title; description carries detail + source + a few tags.
-    const title =
-      format === "short"
-        ? `${payload.headlineFact} #shorts`
-        : `${payload.headlineFact} | ${channel.identity.name}`;
+    // SEO-leaning title with A/B variant rotation.
+    const variant = pickTitle(payload.headlineFact, channel.identity.name, format === "short", date, channel.ab_testing.titles);
+    const title = variant.title;
     const metricsLines = payload.keyMetrics.map((m) => `• ${m.label}: ${m.value}${m.unit ? " " + m.unit : ""}`);
     const description = [
       payload.headlineFact,
@@ -67,7 +95,7 @@ function buildMeta(
       title: title.slice(0, 100),
       description: description.slice(0, 4900),
       hashtags: base.slice(0, 4),
-      extra: { isShort: format === "short" },
+      extra: { isShort: format === "short", titleVariant: variant.id },
     };
   }
 
@@ -107,7 +135,7 @@ export function createMetadataStage(): Stage {
         if (!platform.enabled) continue;
         for (const format of platform.posts) {
           if (!enabledFormats.has(format)) continue;
-          const meta = buildMeta(ctx.channel, payload, platform.id, format);
+          const meta = buildMeta(ctx.channel, payload, platform.id, format, ctx.date);
           // Attach the per-format thumbnail + captions so publishers/assisted bundles use them.
           const thumb = ctx.thumbnails?.find((t) => t.format === format);
           const caption = ctx.captions?.find((c) => c.format === format);

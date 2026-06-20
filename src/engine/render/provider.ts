@@ -108,8 +108,43 @@ export class ManifestRenderEngine implements RenderEngine {
   }
 }
 
+/**
+ * Remotion render engine. Renders a React composition via the Remotion CLI, passing the
+ * payload + brand as input props. Activates only when FACTORY_REMOTION_ENTRY points at a
+ * bundled Remotion project; otherwise the caller falls back to ffmpeg/manifest. This keeps
+ * Remotion (and its heavy deps) optional while wiring the M2 path behind the same interface.
+ */
+export class RemotionRenderEngine implements RenderEngine {
+  readonly name = "remotion";
+  constructor(private entry: string) {}
+  async render(req: RenderRequest): Promise<RenderResult> {
+    const { w, h } = dimensions(req.aspectRatio);
+    const comp = req.channel.render.template || "data-card-v1";
+    const props = JSON.stringify({
+      brand: req.channel.identity.brand,
+      payload: req.payload,
+      script: req.script.sections,
+      aspectRatio: req.aspectRatio,
+      width: w,
+      height: h,
+      audioPath: req.audioPath,
+      durationSec: req.durationSec,
+    });
+    await mkdir(dirname(req.outPath), { recursive: true });
+    const propsFile = req.outPath.replace(/\.mp4$/, ".props.json");
+    await writeFile(propsFile, props);
+    await pexec(
+      `npx --yes remotion render "${this.entry}" "${comp}" "${req.outPath}" ` +
+        `--props="${propsFile}" --width=${w} --height=${h}`,
+    );
+    return { path: req.outPath, mimeType: "video/mp4", durationSec: req.durationSec };
+  }
+}
+
 export async function getRenderEngine(engine: string): Promise<RenderEngine> {
-  // "remotion" is a future engine; for now ffmpeg (if present) or manifest fallback.
+  const remotionEntry = process.env.FACTORY_REMOTION_ENTRY;
+  if (engine === "remotion" && remotionEntry) return new RemotionRenderEngine(remotionEntry);
+  // ffmpeg fast path (also the fallback for remotion when no project is configured).
   if ((engine === "ffmpeg" || engine === "remotion") && (await hasFfmpeg())) {
     return new FfmpegRenderEngine();
   }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { stringify as toYaml } from "yaml";
 import { Command } from "commander";
 import { loadChannelDefinition, defaultConfigPath } from "../config/loader.js";
@@ -8,6 +8,9 @@ import { validateChannel } from "../config/validate.js";
 import { runChannel } from "../engine/run.js";
 import { runGenesis } from "../genesis/index.js";
 import { listAdapters } from "../adapters/registry.js";
+import { BUILT_IN_STYLES } from "../engine/visuals/style.js";
+import { deriveFeedback, type PublicationMetric } from "../analytics/index.js";
+import { dbDir } from "../storage/paths.js";
 
 const program = new Command();
 program.name("factory").description("Channel Factory — agnostic faceless channel automation").version("0.1.0");
@@ -58,8 +61,27 @@ program
   .option("-l, --language <lang>", "language tag", "es-ES")
   .option("-r, --region <region>", "region code", "ES")
   .option("-o, --out <dir>", "output directory", "out/genesis")
-  .action(async (opts: { topic: string; language: string; region: string; out: string }) => {
-    const result = await runGenesis({ topic: opts.topic, language: opts.language, region: opts.region });
+  .option("--text-provider <p>", "anthropic | openai | gemini | auto", "auto")
+  .option("--voice-provider <p>", "elevenlabs | openai | google | stub", "stub")
+  .option("--video <mode>", "data_card | generative", "data_card")
+  .option("--video-provider <p>", "veo | sora | runway | stub", "veo")
+  .option("--style <style>", "visual style for generative video", "realistic")
+  .action(async (opts: {
+    topic: string; language: string; region: string; out: string;
+    textProvider: any; voiceProvider: any; video: any; videoProvider: any; style: string;
+  }) => {
+    const result = await runGenesis({
+      topic: opts.topic,
+      language: opts.language,
+      region: opts.region,
+      prefs: {
+        textProvider: opts.textProvider,
+        voiceProvider: opts.voiceProvider,
+        videoMode: opts.video,
+        videoProvider: opts.videoProvider,
+        style: opts.style,
+      },
+    });
     const dir = resolve(process.cwd(), opts.out);
     await mkdir(dir, { recursive: true });
     const id = result.definition.id;
@@ -79,6 +101,98 @@ program
   .description("List registered niche adapters")
   .action(() => {
     console.log("Registered adapters: " + (listAdapters().join(", ") || "(none)"));
+  });
+
+program
+  .command("providers")
+  .description("List available AI providers per category (text / voice / video)")
+  .action(() => {
+    console.log("Text (LLM):   anthropic, openai, gemini  (auto = first with a key)");
+    console.log("Voice (TTS):  elevenlabs, openai, google, azure, piper, stub");
+    console.log("Video (gen):  veo, sora, runway, stub");
+    console.log("\nKeys read from env (.env): ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY,");
+    console.log("ELEVENLABS_API_KEY, RUNWAY_API_KEY, FACTORY_YT_ACCESS_TOKEN. Missing key → stub fallback.");
+  });
+
+program
+  .command("styles")
+  .description("List built-in visual styles for generative video")
+  .action(() => {
+    for (const [key, s] of Object.entries(BUILT_IN_STYLES)) {
+      console.log(`  ${key.padEnd(12)} ${s.photoreal ? "[photoreal]" : "          "}  ${s.descriptor.slice(0, 70)}…`);
+    }
+    console.log("\nSet video.style to one of these, or define your own in video.custom_styles.");
+  });
+
+program
+  .command("feedback")
+  .description("M6: derive scheduling/hook recommendations from collected metrics")
+  .argument("<channel>", "channel id")
+  .option("-m, --metrics <file>", "metrics JSON file (defaults to out/_db/metrics/<id>.json)")
+  .action(async (channel: string, opts: { metrics?: string }) => {
+    const path = opts.metrics ? resolve(process.cwd(), opts.metrics) : join(dbDir(), "metrics", `${channel}.json`);
+    let metrics: PublicationMetric[];
+    try {
+      metrics = JSON.parse(await readFile(path, "utf8"));
+    } catch {
+      console.log(`No metrics found at ${path}. Use 'factory metrics:sample ${channel}' to generate demo data.`);
+      return;
+    }
+    const signals = deriveFeedback(metrics);
+    if (signals.length === 0) {
+      console.log(`Not enough signal yet (${metrics.length} data points). Keep publishing.`);
+      return;
+    }
+    console.log(`\nFeedback for ${channel} (${metrics.length} publications):`);
+    for (const s of signals) console.log(`  [${s.variable}] (conf ${s.confidence}) ${s.recommendation}`);
+  });
+
+program
+  .command("metrics:sample")
+  .description("Generate synthetic metrics to demo the feedback loop")
+  .argument("<channel>", "channel id")
+  .action(async (channel: string) => {
+    const hours = [18, 21, 21, 21, 9, 14];
+    const classes = ["barato", "caro", "barato", "normal", "barato", "caro"];
+    const metrics: PublicationMetric[] = [];
+    for (let i = 0; i < 18; i++) {
+      const hour = hours[i % hours.length]!;
+      const cls = classes[i % classes.length]!;
+      const base = hour === 21 ? 4200 : hour === 18 ? 2600 : 1500;
+      const clsBoost = cls === "barato" ? 1.3 : cls === "caro" ? 0.85 : 1;
+      metrics.push({
+        channelId: channel,
+        date: `2026-06-${String((i % 28) + 1).padStart(2, "0")}`,
+        platform: "youtube",
+        format: i % 3 === 0 ? "long" : "short",
+        publishHour: hour,
+        classification: cls,
+        views: Math.round(base * clsBoost * (0.9 + (i % 5) * 0.05)),
+        retentionPct: i % 3 === 0 ? 38 + (i % 4) : 52 + (i % 6),
+      });
+    }
+    const dir = join(dbDir(), "metrics");
+    await mkdir(dir, { recursive: true });
+    const path = join(dir, `${channel}.json`);
+    await writeFile(path, JSON.stringify(metrics, null, 2));
+    console.log(`Wrote ${metrics.length} synthetic metrics to ${path}`);
+  });
+
+program
+  .command("worker")
+  .description("Start the BullMQ worker that schedules + runs active channels (needs Redis)")
+  .argument("<channels...>", "channel ids or definition file paths")
+  .action(async (channels: string[]) => {
+    const defs = await Promise.all(channels.map((c) => loadChannelDefinition(resolveConfig(c))));
+    const { startWorker } = await import("../scheduling/worker.js");
+    const handle = await startWorker(defs);
+    console.log(`Worker running for ${defs.length} channel(s). Ctrl+C to stop.`);
+    const stop = async () => {
+      await handle.stop();
+      process.exit(0);
+    };
+    process.on("SIGINT", stop);
+    process.on("SIGTERM", stop);
   });
 
 program.parseAsync(process.argv).catch((err) => {

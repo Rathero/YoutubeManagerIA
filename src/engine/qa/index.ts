@@ -65,6 +65,14 @@ export function createQaStage(): Stage {
         }
       }
 
+      const nonVideo = (ctx.rendered ?? []).filter((r) => r.mimeType !== "video/mp4");
+      if (nonVideo.length > 0) {
+        warnings.push(
+          `${nonVideo.length} render(s) produced a manifest, not an MP4 ` +
+            `(no ffmpeg, or generative provider without API key). Not publishable as video until rendered for real.`,
+        );
+      }
+
       if (ctx.channel.render.music.enabled) {
         // Licensing is config-asserted in the MVP; flag for the operator to confirm.
         warnings.push("music enabled — ensure the track is from a licensed library");

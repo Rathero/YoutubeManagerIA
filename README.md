@@ -88,8 +88,18 @@ npm run factory -- validate luz-es
 npm run factory -- run luz-es --date 2026-06-21 --dry-run   # no publica
 npm run factory -- run luz-es --date 2026-06-21             # deja bundles "1-toque"
 
-# FASE A: generar un canal nuevo desde una idea
-npm run factory -- genesis --topic "precio del gasóleo en España"
+# FASE A: generar un canal nuevo desde una idea (con vídeo IA + estilo)
+npm run factory -- genesis --topic "mitología nórdica" \
+  --video generative --video-provider veo --style cinematic \
+  --voice-provider elevenlabs --text-provider anthropic
+
+# Info y bucle de feedback (M6)
+npm run factory -- providers            # proveedores IA por categoría
+npm run factory -- styles               # estilos visuales para vídeo generativo
+npm run factory -- metrics:sample luz-es && npm run factory -- feedback luz-es
+
+# Worker en bucle (requiere Redis): programa y corre los canales activos
+npm run factory -- worker luz-es
 
 # Tests + typecheck
 npm test
@@ -99,20 +109,52 @@ npm run typecheck
 Los artefactos se generan en `./out/` (configurable con `FACTORY_DATA_DIR`):
 `out/<canal>/<fecha>/{audio,video,queue}` y un store JSON en `out/_db/`.
 
-### Modo offline vs. producción
+### Proveedores de IA configurables (texto · voz · vídeo)
 
-El sistema corre **sin claves ni servicios externos**:
+Todo es **swappable por config** y cada categoría cae a un *stub* determinista si falta
+la clave, así que el pipeline **corre entero offline**. Los 3 proveedores top de cada
+industria vienen integrados:
 
-| Pieza | Sin credenciales (por defecto) | Producción |
-|------|--------------------------------|------------|
-| Datos (luz) | `source: fixture` (incluido) | `source: preciodelaluz` (sin token) / `esios` (token gratis) |
-| Guión/metadata | generación determinista | Anthropic API (`ANTHROPIC_API_KEY`) |
-| Voz (TTS) | stub: WAV de silencio dimensionado | ElevenLabs / Azure / Piper |
-| Render | `ffmpeg` si está instalado, si no manifest JSON | Remotion (`data-card-v1`) |
-| YouTube | cola *assisted* (1-toque) | direct post (`FACTORY_YT_ACCESS_TOKEN`) |
-| TikTok / IG | cola *assisted* (1-toque) | `mode: auto` cuando la app esté aprobada |
+| Categoría | Proveedores (config) | Stub sin clave |
+|-----------|----------------------|----------------|
+| **Texto / LLM** (guión, metadata, storyboard, genesis) | `anthropic` (Claude), `openai` (GPT), `gemini` · `auto` elige el primero con clave | generación determinista |
+| **Voz / TTS** (lo más humano) | `elevenlabs` (v3, el más realista), `openai` (gpt-4o-mini-tts), `google` (Gemini TTS) | WAV silencioso dimensionado |
+| **Vídeo generativo** | `veo` (Veo 3.1, audio nativo), `sora` (Sora 2), `runway` (Gen-4) | clip de color / manifest |
+| **Render data-card** | `ffmpeg`, `remotion` (`FACTORY_REMOTION_ENTRY`) | manifest JSON |
+| **Datos (luz)** | `preciodelaluz` (sin token), `esios` (token gratis) | `fixture` incluido |
+| **Publicación** | YouTube direct-post (`FACTORY_YT_ACCESS_TOKEN`); TikTok/IG `auto` con app aprobada | cola *assisted* 1-toque |
+| **Estado** | `FACTORY_STORE=postgres` (+ `DATABASE_URL`) | JSON store en `out/_db` |
+| **Scheduling** | `factory worker` (BullMQ + `REDIS_URL`) | `factory run` puntual |
 
-Copia `.env.example` a `.env` para activar las piezas de producción.
+`factory providers` y `factory styles` listan lo disponible. Copia `.env.example` a `.env`
+para activar producción.
+
+### Vídeo generativo con IA + estilos
+
+Pon `render.engine: generative` y una sección `video` en la config:
+
+```yaml
+render: { engine: generative, aspect_ratios: ["9:16"] }
+video:
+  mode: generative
+  provider: veo            # veo | sora | runway | stub
+  style: cinematic         # realistic | cinematic | documentary | anime | manga |
+                           # comic | cartoon3d | claymation | pixelart | watercolor
+  clip_seconds: 8
+  resolution: "1080p"
+  use_native_audio: false  # false = narrar con la voz TTS configurada
+  max_clips: 5
+voice: { provider: elevenlabs, voice_id: "<id>", model_id: eleven_v3 }
+```
+
+El pipeline genera un **storyboard** (LLM, con fallback determinista), construye un
+**prompt por plano adaptado a cada proveedor y al estilo elegido**, genera un clip por
+plano, y los **cose con FFmpeg** superponiendo la narración. Estilos extra: declara los
+tuyos en `video.custom_styles`. Ejemplo listo: `src/config/luz-es-veo.yaml`.
+
+```bash
+npm run factory -- run luz-es-veo --dry-run   # offline: storyboard + prompts + manifest
+```
 
 ---
 
@@ -149,18 +191,24 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 
 - **M1 — Núcleo + luz (MVP):** ✅ tipos, orquestador, adapter `luz`, pipeline completo
   (ingest→compute→script→voice→render→metadata→qa→publish→record), trigger con data-gate,
-  CLI (`run`/`validate`/`genesis`/`adapters`), store JSON, tests.
-- **M2 — Multi-formato:** ✅ short + long desde el mismo payload; render por aspect ratio
-  (9:16 / 16:9). Remotion queda como engine enchufable detrás de `RenderEngine`.
+  CLI, store JSON, tests.
+- **M2 — Multi-formato + render:** ✅ short + long desde el mismo payload; 9:16 / 16:9;
+  motores `ffmpeg` / `remotion` (vía `FACTORY_REMOTION_ENTRY`) / generativo, todos detrás
+  de `RenderEngine`.
 - **M3 — Multiplataforma:** ✅ publishers YT/TikTok/IG con modos `auto`/`assisted` y
-  variantes de copy/hashtags por plataforma. *(Newsletter propio: interfaz lista.)*
-- **M4 — Estado/analítica:** ✅ store + trazabilidad por run; cola/Postgres/métricas
-  quedan como swaps detrás de las interfaces (`Store`, `MetricsSource`).
-- **M5 — Genesis:** ✅ `topic` → ChannelDefinition draft + informe + viability score.
-- **M6 — Feedback loop:** interfaces definidas (`analytics/`), implementación pendiente.
+  variantes de copy/hashtags por plataforma.
+- **M4 — Cola + estado:** ✅ store **Postgres** (`PostgresStore`) además del JSON, y
+  **worker BullMQ** (`factory worker`, lazy-import). Selección por env.
+- **M5 — Genesis:** ✅ `topic` → ChannelDefinition draft + informe + viability score, ahora
+  con preferencias de proveedor/estilo (`--text-provider`, `--voice-provider`, `--video`,
+  `--video-provider`, `--style`).
+- **M6 — Feedback loop:** ✅ atribución de rendimiento (`deriveFeedback`) → recomendaciones
+  de horario/formato/hook. `factory feedback <canal>` (+ `metrics:sample` para demo).
+- **Generación por IA (texto/voz/vídeo):** ✅ 3 proveedores top por categoría + sistema de
+  estilos + storyboard + prompts por proveedor.
 
-Las piezas marcadas como "swap/pendiente" están **detrás de una interfaz** para
-cambiarlas sin reescribir el núcleo (BullMQ, Postgres, Remotion, ElevenLabs, etc.).
+Las integraciones de pago van **sobre `fetch` detrás de interfaces** (sin SDKs): cambiar
+de proveedor es config, no código.
 
 ---
 

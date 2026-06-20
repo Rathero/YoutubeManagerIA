@@ -2,28 +2,36 @@ import { join } from "node:path";
 import type { Stage } from "../../core/pipeline/stage.js";
 import type { RenderedAsset } from "../../core/types/index.js";
 import { runDir } from "../../storage/paths.js";
+import type { LlmClient } from "../llm/client.js";
 import { getRenderEngine } from "./provider.js";
+import { renderGenerative } from "./generative.js";
 
 /** Map a format to the aspect ratios it should be rendered in. */
 function aspectsForFormat(format: string, channelAspects: string[]): string[] {
-  if (format === "short") return channelAspects.filter((a) => a === "9:16").length ? ["9:16"] : ["9:16"];
+  if (format === "short") return ["9:16"];
   if (format === "square") return ["1:1"];
-  // long & weekly default to 16:9 (fallback to whatever the channel declares).
-  return channelAspects.filter((a) => a === "16:9").length ? ["16:9"] : ["16:9"];
+  return channelAspects.includes("16:9") ? ["16:9"] : ["16:9"];
+}
+
+function isGenerative(channel: { render: { engine: string }; video?: { mode: string } }): boolean {
+  return channel.render.engine === "generative" || channel.video?.mode === "generative";
 }
 
 /**
- * Stage 6 — Render. One payload → many outputs. Renders each format into its target
- * aspect ratio(s), parametrized by brand. Engine is swappable (ffmpeg/remotion/manifest).
+ * Stage 6 — Render. One payload → many outputs. Two paths behind one stage:
+ *  - data_card: brand-colored data graphics (ffmpeg / remotion / manifest)
+ *  - generative: AI-generated footage (Veo/Sora/Runway) stitched with narration
+ * Engine and provider are swappable; both fall back gracefully when tools/keys are absent.
  */
-export function createRenderStage(): Stage {
+export function createRenderStage(llm: LlmClient | null): Stage {
   return {
     name: "render",
     async run(ctx) {
       if (!ctx.scripts || !ctx.audio || !ctx.payload) throw new Error("render: missing inputs");
-      const engine = await getRenderEngine(ctx.channel.render.engine);
       const dir = join(runDir(ctx.channel.id, ctx.date), "video");
       const channelAspects = ctx.channel.render.aspect_ratios;
+      const generative = isGenerative(ctx.channel) && Boolean(ctx.channel.video);
+      const engine = generative ? null : await getRenderEngine(ctx.channel.render.engine);
 
       const rendered: RenderedAsset[] = [];
       for (const script of ctx.scripts) {
@@ -31,7 +39,22 @@ export function createRenderStage(): Stage {
         if (!audio) throw new Error(`render: no audio for format ${script.format}`);
         for (const aspect of aspectsForFormat(script.format, channelAspects)) {
           const outPath = join(dir, `${script.format}-${aspect.replace(":", "x")}.mp4`);
-          const res = await engine.render({
+          if (generative) {
+            rendered.push(
+              await renderGenerative({
+                channel: ctx.channel,
+                payload: ctx.payload,
+                script,
+                audio,
+                aspectRatio: aspect,
+                outPath,
+                llm,
+                log: ctx.log,
+              }),
+            );
+            continue;
+          }
+          const res = await engine!.render({
             channel: ctx.channel,
             payload: ctx.payload,
             script,
@@ -50,7 +73,7 @@ export function createRenderStage(): Stage {
         }
       }
       ctx.rendered = rendered;
-      ctx.log("info", "render done", { engine: engine.name, assets: rendered.length });
+      ctx.log("info", "render done", { mode: generative ? "generative" : "data_card", assets: rendered.length });
     },
   };
 }

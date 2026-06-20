@@ -40,6 +40,33 @@ export async function validateChannel(channel: ChannelDefinition): Promise<Valid
     errors.push("no enabled formats");
   }
 
+  // Generative video config sanity.
+  const generative = channel.render.engine === "generative" || channel.video?.mode === "generative";
+  if (generative) {
+    if (!channel.video) {
+      errors.push("render.engine=generative requires a `video` section");
+    } else {
+      const keyByProvider: Record<string, string> = {
+        veo: "GEMINI_API_KEY/GOOGLE_API_KEY",
+        sora: "OPENAI_API_KEY",
+        runway: "RUNWAY_API_KEY",
+      };
+      const need = keyByProvider[channel.video.provider];
+      const have =
+        (channel.video.provider === "veo" && (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)) ||
+        (channel.video.provider === "sora" && process.env.OPENAI_API_KEY) ||
+        (channel.video.provider === "runway" && (process.env.RUNWAY_API_KEY || process.env.RUNWAYML_API_SECRET));
+      if (need && !have) {
+        warnings.push(`video.provider=${channel.video.provider} but ${need} not set — will use stub clips`);
+      }
+    }
+  }
+
+  // Realistic-voice provider key hints.
+  if (channel.voice.provider === "elevenlabs" && !process.env.ELEVENLABS_API_KEY) {
+    warnings.push("voice.provider=elevenlabs but ELEVENLABS_API_KEY not set — will use stub voice");
+  }
+
   const enabledPlatforms = channel.platforms.filter((p) => p.enabled);
   if (enabledPlatforms.length === 0) {
     warnings.push("no enabled platforms — nothing will be published");

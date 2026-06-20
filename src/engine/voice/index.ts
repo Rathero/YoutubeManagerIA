@@ -6,28 +6,30 @@ import { getTtsProvider, hashText } from "./provider.js";
 
 /**
  * Stage 4 — Voice. One audio track per format. Cache key = hash of narration text,
- * so re-running a day with unchanged scripts doesn't re-synthesize.
+ * so re-running a day with unchanged scripts doesn't re-synthesize. Provider is
+ * swappable (ElevenLabs/OpenAI/Google/stub) and falls back to stub without keys.
  */
 export function createVoiceStage(): Stage {
   return {
     name: "voice",
     async run(ctx) {
       if (!ctx.scripts) throw new Error("voice: no scripts");
-      const provider = getTtsProvider(ctx.channel.voice.provider);
-      const speed = ctx.channel.voice.speed;
-      const voiceId = ctx.channel.voice.voice_id;
+      const { provider, fellBack } = getTtsProvider(ctx.channel.voice);
+      if (fellBack) {
+        ctx.log("warn", `voice provider "${ctx.channel.voice.provider}" unavailable; using stub`);
+      }
       const dir = join(runDir(ctx.channel.id, ctx.date), "audio");
 
       const audio: AudioAsset[] = [];
       for (const script of ctx.scripts) {
         const textHash = hashText(script.narration);
-        const outPath = join(dir, `${script.format}-${textHash}.wav`);
-        const res = await provider.synthesize({ text: script.narration, voiceId, speed, outPath });
+        const outPath = join(dir, `${script.format}-${textHash}.audio`);
+        const res = await provider.synthesize({ text: script.narration, outPath });
         audio.push({
           format: script.format,
           path: res.path,
           durationSec: res.durationSec,
-          loudnessLufs: -14, // stub normalizes to target; real provider measures.
+          loudnessLufs: provider.name === "stub" ? -14 : undefined,
           textHash: res.textHash,
         });
       }

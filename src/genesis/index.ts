@@ -7,6 +7,14 @@ export interface GenesisInput {
   language?: string;
   region?: string;
   constraints?: { platforms?: string[]; cadence?: string };
+  /** Production preferences baked into the draft config. */
+  prefs?: {
+    textProvider?: "anthropic" | "openai" | "gemini" | "auto";
+    voiceProvider?: "elevenlabs" | "openai" | "google" | "stub";
+    videoMode?: "data_card" | "generative";
+    videoProvider?: "veo" | "sora" | "runway" | "stub";
+    style?: string;
+  };
 }
 
 export interface ViabilityScore {
@@ -99,6 +107,8 @@ function buildDefinition(input: GenesisInput, a: Analysis): ChannelDefinition {
   const region = input.region ?? "ES";
   const id = `${slugify(a.brandName || input.topic)}-${region.toLowerCase()}`;
   const adapterKey = hasAdapter(slugify(input.topic)) ? slugify(input.topic) : "generic";
+  const prefs = input.prefs ?? {};
+  const generative = prefs.videoMode === "generative";
 
   const draft = {
     id,
@@ -141,9 +151,33 @@ function buildDefinition(input: GenesisInput, a: Analysis): ChannelDefinition {
       prompt_template: `src/templates/${adapterKey}/script.md`,
       max_words: { short: 110, long: 420 },
       language_rules: `${language}, frases cortas`,
+      provider: { name: prefs.textProvider ?? "auto" },
     },
-    voice: { provider: "stub" as const, speed: 1.05 },
-    render: { engine: "ffmpeg" as const, template: "data-card-v1", aspect_ratios: ["9:16", "16:9"], music: { enabled: false } },
+    voice: {
+      provider: prefs.voiceProvider ?? "stub",
+      speed: 1.05,
+      ...(prefs.voiceProvider === "elevenlabs" ? { model_id: "eleven_v3", stability: 0.4, similarity: 0.85 } : {}),
+    },
+    render: {
+      engine: generative ? ("generative" as const) : ("ffmpeg" as const),
+      template: "data-card-v1",
+      aspect_ratios: ["9:16", "16:9"],
+      music: { enabled: false },
+    },
+    ...(generative
+      ? {
+          video: {
+            mode: "generative" as const,
+            provider: prefs.videoProvider ?? ("veo" as const),
+            style: prefs.style ?? "realistic",
+            clip_seconds: 8,
+            resolution: "1080p" as const,
+            use_native_audio: false,
+            max_clips: 5,
+            llm_storyboard: true,
+          },
+        }
+      : {}),
     platforms: [
       { id: "youtube" as const, enabled: true, account_ref: `secrets://youtube/${id}`, posts: ["short" as const], publish_times: { short: "21:30" }, mode: "assisted" as const },
     ],

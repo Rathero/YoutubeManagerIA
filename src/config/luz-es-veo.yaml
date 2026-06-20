@@ -1,0 +1,98 @@
+id: luz-es-veo
+status: active
+version: 1
+
+identity:
+  name: "Luz Hoy — Cine"
+  language: es-ES
+  region: ES
+  brand:
+    palette: { bg: "#0b1220", fg: "#ffffff", accent: "#3b82f6" }
+    fonts: { heading: "Inter", body: "Inter" }
+    visual_template: "data-card-v1"
+  voice_persona:
+    description: "Cercano, claro, sin humo. Va al grano. Tutea."
+    do: ["dar el dato ya", "una recomendación accionable"]
+    dont: ["clickbait", "alarmismo"]
+
+niche:
+  topic: "precio diario de la electricidad PVPC en España"
+  audience: "hogares en tarifa regulada que quieren ahorrar planificando consumos"
+  value_proposition: "saber cada tarde a qué hora consumir mañana sale más barato"
+  monetization:
+    primary: affiliate
+    affiliate_verticals: ["comparadores tarifas", "placas solares", "enchufes inteligentes"]
+
+data:
+  adapter: "luz"
+  freshness: { type: daily_dayahead, available_after: "20:00 Europe/Madrid", confirm_field: "tomorrow_present" }
+  config:
+    source: "fixture"
+    fixturePath: "src/adapters/luz/fixtures/sample.json"
+    zone: "PCB"
+    baselineEurKwh: 0.115
+    appliances:
+      - { key: "lavadora", duration_h: 2 }
+      - { key: "coche_ve", duration_h: 7, prefer: "night" }
+
+formats:
+  - kind: short
+    enabled: true
+    target_seconds: 40
+    structure: ["hook", "dato_clave", "franjas_recomendadas", "cta"]
+
+script:
+  prompt_template: "src/templates/luz/script.md"
+  max_words: { short: 110 }
+  language_rules: "es-ES, frases cortas, números con coma decimal"
+  # Text provider for script + metadata. "auto" = first available key (anthropic→openai→gemini).
+  provider: { name: auto }
+
+voice:
+  # Most realistic: ElevenLabs v3. Falls back to the stub if ELEVENLABS_API_KEY is missing.
+  provider: elevenlabs
+  voice_id: "<tu_voice_id_es_ES>"
+  model_id: "eleven_v3"
+  speed: 1.0
+  stability: 0.4
+  similarity: 0.85
+  style_exaggeration: 0.3
+  emotion: "tono cercano y natural, como explicándole a un amigo"
+
+render:
+  engine: generative
+  aspect_ratios: ["9:16"]
+  music: { enabled: false }
+
+# Generative AI video. Pick provider + style; prompts are built per-provider automatically.
+video:
+  mode: generative
+  provider: veo            # veo | sora | runway | stub  (falls back to stub without a key)
+  style: cinematic         # realistic | cinematic | documentary | anime | manga | comic | cartoon3d | claymation | pixelart | watercolor
+  clip_seconds: 8
+  resolution: "1080p"
+  use_native_audio: false  # false = narrate with the TTS voice above
+  max_clips: 5
+  llm_storyboard: true
+
+platforms:
+  - id: youtube
+    enabled: true
+    account_ref: "secrets://youtube/luz-es-veo"
+    posts: ["short"]
+    publish_times: { short: "21:30" }
+    mode: assisted
+  - id: tiktok
+    enabled: true
+    account_ref: "secrets://tiktok/luz-es-veo"
+    posts: ["short"]
+    publish_times: { short: "21:35" }
+    mode: assisted
+
+schedule:
+  timezone: "Europe/Madrid"
+  trigger: { type: time_with_data_gate, at: "20:30", retry_every_min: 10, give_up_at: "23:00" }
+
+kpis:
+  targets: { short_retention_pct: 55 }
+  review_after_days: 28

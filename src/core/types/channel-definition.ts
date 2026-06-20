@@ -83,16 +83,68 @@ const ScriptSchema = z.object({
   prompt_template: z.string(),
   max_words: z.record(z.number().int().positive()).default({}),
   language_rules: z.string().optional(),
+  /** Text/LLM provider for script + metadata. Falls back to env, then deterministic. */
+  provider: z
+    .object({
+      name: z.enum(["anthropic", "openai", "gemini", "auto"]).default("auto"),
+      model: z.string().optional(),
+    })
+    .default({ name: "auto" }),
 });
 
 const VoiceSchema = z.object({
-  provider: z.enum(["elevenlabs", "azure", "piper", "stub"]).default("stub"),
+  provider: z
+    .enum(["elevenlabs", "openai", "google", "azure", "piper", "stub"])
+    .default("stub"),
   voice_id: z.string().optional(),
   speed: z.number().positive().default(1),
+  /** Provider model id (e.g. ElevenLabs "eleven_v3", OpenAI "gpt-4o-mini-tts"). */
+  model_id: z.string().optional(),
+  /** Realism/expressiveness knobs (provider-dependent; 0..1). */
+  stability: z.number().min(0).max(1).optional(),
+  similarity: z.number().min(0).max(1).optional(),
+  style_exaggeration: z.number().min(0).max(1).optional(),
+  /** Free-form delivery direction passed to expressive models. */
+  emotion: z.string().optional(),
+});
+
+/**
+ * Visual style — drives provider-specific prompt generation for generative video.
+ * Built-in keys live in engine/visuals/style.ts; channels can also declare custom
+ * styles inline (custom_styles) so the system is open-ended for any aesthetic.
+ */
+const CustomStyleSchema = z.object({
+  /** Core look description injected into every shot prompt. */
+  descriptor: z.string(),
+  /** Things to avoid (negative prompt), when the provider supports it. */
+  negative: z.string().optional(),
+  /** Camera/motion guidance. */
+  motion: z.string().optional(),
+  /** Whether this style depicts photoreal humans (affects safety/disclosure copy). */
+  photoreal: z.boolean().default(false),
+});
+
+const VideoSchema = z.object({
+  /** data_card = rendered data graphics; generative = AI-generated footage. */
+  mode: z.enum(["data_card", "generative"]).default("data_card"),
+  provider: z.enum(["veo", "sora", "runway", "stub"]).default("stub"),
+  /** Built-in or custom style key. e.g. realistic | cinematic | anime | manga | comic | cartoon3d | claymation | pixelart | watercolor */
+  style: z.string().default("realistic"),
+  /** Seconds per generated clip (most providers cap ~4-12s). */
+  clip_seconds: z.number().int().positive().default(8),
+  resolution: z.enum(["720p", "1080p", "4k"]).default("1080p"),
+  /** Use the video model's own generated audio (Veo) instead of TTS. */
+  use_native_audio: z.boolean().default(false),
+  /** Cap on clips per piece (cost guard). */
+  max_clips: z.number().int().positive().default(6),
+  /** LLM-built storyboard, or deterministic split when false/no LLM. */
+  llm_storyboard: z.boolean().default(true),
+  custom_styles: z.record(CustomStyleSchema).default({}),
 });
 
 const RenderSchema = z.object({
-  engine: z.enum(["remotion", "ffmpeg", "stub"]).default("ffmpeg"),
+  /** generative = use the video providers; ffmpeg/remotion = data-card rendering. */
+  engine: z.enum(["remotion", "ffmpeg", "generative", "stub"]).default("ffmpeg"),
   template: z.string().default("data-card-v1"),
   aspect_ratios: z.array(z.string()).default(["9:16"]),
   music: z
@@ -143,6 +195,7 @@ export const ChannelDefinitionSchema = z.object({
   script: ScriptSchema,
   voice: VoiceSchema,
   render: RenderSchema,
+  video: VideoSchema.optional(),
   platforms: z.array(PlatformSchema).default([]),
   distribution_own: z
     .object({
@@ -161,3 +214,6 @@ export const ChannelDefinitionSchema = z.object({
 export type ChannelDefinition = z.infer<typeof ChannelDefinitionSchema>;
 export type Platform = z.infer<typeof PlatformSchema>;
 export type Format = z.infer<typeof FormatSchema>;
+export type VideoConfig = z.infer<typeof VideoSchema>;
+export type CustomStyle = z.infer<typeof CustomStyleSchema>;
+export type VoiceConfig = z.infer<typeof VoiceSchema>;

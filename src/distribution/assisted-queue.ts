@@ -23,6 +23,8 @@ export async function enqueueAssisted(
     format: meta.format,
     file: asset.path,
     aspectRatio: asset.aspectRatio,
+    thumbnail: (meta.extra?.thumbnailPath as string | undefined) ?? null,
+    subtitles: (meta.extra?.captionsPath as string | undefined) ?? null,
     title: meta.title,
     description: meta.description,
     hashtags: meta.hashtags,

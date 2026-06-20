@@ -194,6 +194,20 @@ const RenderSchema = z.object({
       volume_db: z.number().optional(),
     })
     .default({ enabled: false }),
+  /** Burned-in / sidecar captions. Great for retention on silent-autoplay shorts. */
+  captions: z
+    .object({
+      enabled: z.boolean().default(true),
+      burn_in: z.boolean().default(false),
+      max_chars_per_line: z.number().int().positive().default(38),
+    })
+    .default({ enabled: true, burn_in: false, max_chars_per_line: 38 }),
+  /** Auto-generated thumbnail per video (CTR). */
+  thumbnails: z
+    .object({
+      enabled: z.boolean().default(true),
+    })
+    .default({ enabled: true }),
 });
 
 const PlatformSchema = z.object({

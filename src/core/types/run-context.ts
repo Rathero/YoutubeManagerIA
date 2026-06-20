@@ -28,6 +28,19 @@ export interface RenderedAsset {
   mimeType: string;
 }
 
+export interface CaptionAsset {
+  format: FormatKind;
+  /** Path to the .srt file. */
+  path: string;
+  cueCount: number;
+}
+
+export interface ThumbnailAsset {
+  format: FormatKind;
+  path: string;
+  mimeType: string;
+}
+
 export interface PlatformMeta {
   platform: "youtube" | "tiktok" | "instagram";
   format: FormatKind;
@@ -53,7 +66,9 @@ export type StageName =
   | "compute"
   | "script"
   | "voice"
+  | "captions"
   | "render"
+  | "thumbnail"
   | "metadata"
   | "qa"
   | "publish"
@@ -86,7 +101,9 @@ export interface RunContext {
   payload?: ContentPayload;
   scripts?: FormatScript[];
   audio?: AudioAsset[];
+  captions?: CaptionAsset[];
   rendered?: RenderedAsset[];
+  thumbnails?: ThumbnailAsset[];
   metadata?: PlatformMeta[];
   qa?: { passed: boolean; failures: string[]; warnings: string[] };
   publications?: PublishResult[];

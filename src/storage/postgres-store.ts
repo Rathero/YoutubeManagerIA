@@ -78,6 +78,24 @@ export class PostgresStore implements Store {
     };
   }
 
+  async listRuns(channelId: string, limit = 20): Promise<RunRecord[]> {
+    await this.ready;
+    const res = await this.pool.query(
+      "SELECT * FROM runs WHERE channel_id=$1 ORDER BY created_at DESC LIMIT $2",
+      [channelId, limit],
+    );
+    return res.rows.map((row: any) => ({
+      runId: row.run_id,
+      channelId: row.channel_id,
+      date: row.date,
+      status: row.status,
+      reason: row.reason ?? undefined,
+      stages: row.stages,
+      publications: row.publications,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  }
+
   async isPublished(channelId: string, date: string, format: string, platform: string): Promise<boolean> {
     await this.ready;
     const res = await this.pool.query(

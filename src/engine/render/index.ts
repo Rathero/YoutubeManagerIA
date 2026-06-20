@@ -58,6 +58,8 @@ export function createRenderStage(llm: LlmClient | null): Stage {
             );
             continue;
           }
+          const burnIn = ctx.channel.render.captions.enabled && ctx.channel.render.captions.burn_in;
+          const captionsPath = burnIn ? ctx.captions?.find((c) => c.format === script.format)?.path : undefined;
           const res = await engine!.render({
             channel: ctx.channel,
             payload: ctx.payload,
@@ -66,6 +68,7 @@ export function createRenderStage(llm: LlmClient | null): Stage {
             durationSec: audio.durationSec,
             aspectRatio: aspect,
             outPath,
+            captionsPath,
           });
           rendered.push({
             format: script.format,

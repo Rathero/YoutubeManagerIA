@@ -14,6 +14,8 @@ export interface RenderRequest {
   durationSec: number;
   aspectRatio: string; // "9:16" | "16:9" | "1:1"
   outPath: string; // .mp4
+  /** Optional .srt to burn into the video (when render.captions.burn_in). */
+  captionsPath?: string;
 }
 
 export interface RenderResult {
@@ -70,10 +72,11 @@ export class FfmpegRenderEngine implements RenderEngine {
     await mkdir(dirname(req.outPath), { recursive: true });
 
     const dur = Math.max(1, req.durationSec);
+    const subs = req.captionsPath ? `,subtitles='${req.captionsPath.replace(/'/g, "\\'")}'` : "";
     const cmd =
       `ffmpeg -y -f lavfi -i color=c=${bg}:s=${w}x${h}:d=${dur} -i "${req.audioPath}" ` +
       `-vf "drawtext=text='${headline}':fontcolor=${fg}:fontsize=${Math.round(w / 22)}:` +
-      `x=(w-text_w)/2:y=(h-text_h)/2:line_spacing=12" ` +
+      `x=(w-text_w)/2:y=(h-text_h)/2:line_spacing=12${subs}" ` +
       `-c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "${req.outPath}"`;
     await pexec(cmd);
     return { path: req.outPath, mimeType: "video/mp4", durationSec: dur };

@@ -10,7 +10,9 @@ import { createIngestStage } from "./ingest/index.js";
 import { createComputeStage } from "./compute/index.js";
 import { createScriptStage } from "./script/index.js";
 import { createVoiceStage } from "./voice/index.js";
+import { createCaptionsStage } from "./captions/index.js";
 import { createRenderStage } from "./render/index.js";
+import { createThumbnailStage } from "./thumbnail/index.js";
 import { createMetadataStage } from "./metadata/index.js";
 import { createQaStage } from "./qa/index.js";
 import { createPublishStage } from "./publish/index.js";
@@ -54,7 +56,9 @@ export async function runChannel(channel: ChannelDefinition, opts: RunOptions = 
     createComputeStage(adapter),
     createScriptStage(llm),
     createVoiceStage(),
+    createCaptionsStage(),
     createRenderStage(llm),
+    createThumbnailStage(),
     createMetadataStage(),
     createQaStage(),
     createPublishStage(store),

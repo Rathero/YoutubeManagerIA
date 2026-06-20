@@ -107,7 +107,14 @@ export function createMetadataStage(): Stage {
         if (!platform.enabled) continue;
         for (const format of platform.posts) {
           if (!enabledFormats.has(format)) continue;
-          metas.push(buildMeta(ctx.channel, payload, platform.id, format));
+          const meta = buildMeta(ctx.channel, payload, platform.id, format);
+          // Attach the per-format thumbnail + captions so publishers/assisted bundles use them.
+          const thumb = ctx.thumbnails?.find((t) => t.format === format);
+          const caption = ctx.captions?.find((c) => c.format === format);
+          if (thumb || caption) {
+            meta.extra = { ...meta.extra, thumbnailPath: thumb?.path, captionsPath: caption?.path };
+          }
+          metas.push(meta);
         }
       }
       ctx.metadata = metas;

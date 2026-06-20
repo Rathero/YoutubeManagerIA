@@ -268,6 +268,21 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 
 ---
 
+## Extras de calidad y distribución
+
+- **Subtítulos (.srt):** la etapa `captions` genera subtítulos por formato, sincronizados con
+  el audio (clave para la retención en autoplay silenciado). Sidecar por defecto, o **quemados**
+  en el vídeo con `render.captions.burn_in: true`. Van también en el bundle *assisted*.
+- **Thumbnails:** la etapa `thumbnail` crea una miniatura por vídeo (imagen IA si hay proveedor
+  configurado, si no una *data-card* de marca con ffmpeg). Se adjunta a la metadata de YouTube
+  y al bundle de publicación. Desactivable con `render.thumbnails.enabled: false`.
+- **Trazabilidad:** `factory runs <canal>` lista las últimas ejecuciones (estado, etapa que
+  falló, nº de salidas) desde el store (JSON o Postgres).
+- **CI:** `.github/workflows/ci.yml` corre typecheck + tests + build + un *smoke* del CLI en
+  **Ubuntu y Windows** (Node 20 y 22) en cada push.
+
+---
+
 ## Añadir un canal nuevo (sin código)
 
 1. `npm run factory -- create --topic "<idea>"` → onboarding guiado: elige enfoque,

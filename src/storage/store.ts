@@ -30,6 +30,8 @@ export interface Store {
   getRun(runId: string): Promise<RunRecord | null>;
   /** Idempotency: has (channel,date,format,platform) already been published? */
   isPublished(channelId: string, date: string, format: string, platform: string): Promise<boolean>;
+  /** Recent runs for a channel, newest first (traceability). */
+  listRuns(channelId: string, limit?: number): Promise<RunRecord[]>;
 }
 
 async function readJson<T>(path: string): Promise<T | null> {
@@ -93,6 +95,23 @@ export class JsonStore implements Store {
       }
     }
     return false;
+  }
+
+  async listRuns(channelId: string, limit = 20): Promise<RunRecord[]> {
+    const runsDir = join(this.dir, "runs");
+    let files: string[];
+    try {
+      files = await readdir(runsDir);
+    } catch {
+      return [];
+    }
+    const runs: RunRecord[] = [];
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const rec = await readJson<RunRecord>(join(runsDir, file));
+      if (rec && rec.channelId === channelId) runs.push(rec);
+    }
+    return runs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
   }
 }
 

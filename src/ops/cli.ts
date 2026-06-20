@@ -118,6 +118,30 @@ program
   });
 
 program
+  .command("runs")
+  .description("List recent runs for a channel (status, stages, publications)")
+  .argument("<channel>", "channel id")
+  .option("-n, --limit <n>", "max runs to show", "15")
+  .action(async (channel: string, opts: { limit: string }) => {
+    const { getStore } = await import("../storage/index.js");
+    const store = await getStore();
+    const runs = await store.listRuns(channel, Number(opts.limit));
+    if (runs.length === 0) {
+      console.log(`No runs recorded for ${channel}.`);
+      return;
+    }
+    console.log(`\nÚltimas ejecuciones de ${channel}:`);
+    for (const r of runs) {
+      const pub = r.publications.filter((p) => p.status === "published" || p.status === "queued_assisted").length;
+      const failed = r.stages.find((s) => s.status === "failed");
+      const tag = r.status === "completed" ? "✅" : r.status === "skipped" ? "⏭" : "❌";
+      console.log(`  ${tag} ${r.date}  ${r.status.padEnd(9)} ${pub} salida(s)  ${failed ? "· falló en " + failed.stage : ""}  (${r.runId.slice(0, 8)})`);
+      if (r.reason) console.log(`        ${r.reason}`);
+    }
+    console.log("");
+  });
+
+program
   .command("doctor")
   .description("Check which local servers (LLM/TTS/ComfyUI) and cloud keys are available")
   .action(async () => {

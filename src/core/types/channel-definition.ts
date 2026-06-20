@@ -53,6 +53,13 @@ const NicheSchema = z.object({
   audience: z.string(),
   value_proposition: z.string(),
   monetization: MonetizationSchema,
+  /**
+   * What kind of content this channel produces — drives QA strictness:
+   *  - data:      grounded in fresh external numbers (QA requires verified facts + metrics)
+   *  - knowledge: explainer/curiosities (LLM-authored, sources encouraged)
+   *  - story:     narrative/creative (LLM-authored, no external data required)
+   */
+  content_kind: z.enum(["data", "knowledge", "story"]).default("data"),
 });
 
 const FreshnessSchema = z.object({

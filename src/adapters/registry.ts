@@ -1,11 +1,22 @@
 import type { AdapterFactory, NicheAdapter } from "./_interface.js";
 import { createLuzAdapter } from "./luz/index.js";
+import { createGenerativeAdapter } from "./generative/index.js";
+import { createHttpAdapter } from "./http/index.js";
 
 /**
  * Adapter registry: maps ChannelDefinition.data.adapter -> factory.
- * Adding a niche means registering one entry here (plus its folder).
+ *
+ * Most channels need NO code: use the declarative adapters
+ *  - "generative": content authored by the LLM from the topic (any niche, no data source)
+ *  - "http":       a JSON feed mapped declaratively (data niches, no code)
+ * Hand-written adapters (like "luz") remain supported as worked examples.
  */
-const registry = new Map<string, AdapterFactory>([["luz", createLuzAdapter]]);
+const registry = new Map<string, AdapterFactory>([
+  ["luz", createLuzAdapter],
+  ["generative", createGenerativeAdapter],
+  ["generic", createGenerativeAdapter], // back-compat alias
+  ["http", createHttpAdapter],
+]);
 
 export function registerAdapter(key: string, factory: AdapterFactory): void {
   registry.set(key, factory);

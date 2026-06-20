@@ -35,20 +35,38 @@ Es el "idioma común" adapter → engine. Todo nicho produce esta forma; el engi
 renderiza esta forma (`hook → tarjetas → cuerpo → gráfico → recomendación → CTA`).
 Ver `src/core/types/content-payload.ts`.
 
-### El punto de extensión: `NicheAdapter`
+### Crear un canal SIN código (onboarding guiado)
 
-Lo único de dominio que se programa por canal (`src/adapters/_interface.ts`):
+No hace falta programar nada. Describe la temática y el sistema te **guía** hasta el
+enfoque, el **modelo de vídeo** y el **estilo**, y escribe una config ejecutable:
 
-```ts
-interface NicheAdapter {
-  isReady(ctx): Promise<{ ready: boolean; reason?: string }>; // gate de frescura
-  fetch(ctx): Promise<RawData>;                               // trae datos crudos
-  analyze(raw, ctx): Promise<ContentPayload>;                 // lógica DETERMINISTA
-}
+```bash
+npm run factory -- create --topic "mitología nórdica: dioses y leyendas"
+# (interactivo: propone tipo de contenido, estilo, modelo de vídeo, voz, formatos…
+#  pulsa Enter para aceptar cada recomendación o escribe otra opción)
+
+npm run factory -- create --topic "precio del gasóleo en España" --yes   # acepta todo
 ```
 
-**El LLM redacta, no inventa:** todas las cifras vienen de `analyze()` (determinista);
-el LLM solo convierte datos en lenguaje natural en la etapa de guión.
+El sistema detecta si el nicho es de **datos**, **conocimiento** o **historia**, elige el
+adapter declarativo adecuado, recomienda estilo+modelo según la temática (p.ej. historia →
+*cinematic* + Veo; anime → *anime*; datos → *data_card*), y deja la config en `src/config/`.
+A partir de ahí entra directa en la pipeline: `factory run <id> --dry-run`.
+
+### Adapters: declarativos (sin código) o programados
+
+El adapter produce el `ContentPayload`. Hay dos **declarativos** (cero código) y el
+contrato sigue abierto para casos a medida (`src/adapters/_interface.ts`):
+
+| Adapter | Para qué | Config |
+|---------|----------|--------|
+| **`generative`** | cualquier tema sin fuente de datos (historia, curiosidades, motivación…) | el LLM crea el contenido del día desde `niche.topic`; rota ángulos por fecha |
+| **`http`** | nichos de datos con un feed JSON | `url` + `y_field` + mapeo; calcula min/max/media y construye el payload |
+| **`luz`** (código) | ejemplo trabajado (PVPC) | adapter TypeScript a medida |
+
+**El LLM redacta, no inventa** en nichos de datos (las cifras salen de `analyze()`
+determinista). En nichos `story`/`knowledge` el contenido lo autoría el LLM y se etiqueta
+como generado por IA; el QA gate ajusta su exigencia según `niche.content_kind`.
 
 ---
 
@@ -88,7 +106,11 @@ npm run factory -- validate luz-es
 npm run factory -- run luz-es --date 2026-06-21 --dry-run   # no publica
 npm run factory -- run luz-es --date 2026-06-21             # deja bundles "1-toque"
 
-# FASE A: generar un canal nuevo desde una idea (con vídeo IA + estilo)
+# Crear un canal SIN código (guiado): describe la temática y te lleva al modelo+estilo
+npm run factory -- create --topic "curiosidades del espacio"
+npm run factory -- create --topic "precio del Bitcoin hoy" --yes   # acepta recomendaciones
+
+# FASE A (alternativa analítica): informe de estrategia + viability + draft
 npm run factory -- genesis --topic "mitología nórdica" \
   --video generative --video-provider veo --style cinematic \
   --voice-provider elevenlabs --text-provider anthropic
@@ -171,19 +193,17 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 
 ---
 
-## Añadir un canal nuevo (demuestra que es agnóstico)
+## Añadir un canal nuevo (sin código)
 
-1. `npm run factory -- genesis --topic "<idea>"` → `ChannelDefinition` (draft) + informe
-   + (si aplica) spec de adapter.
-2. Revisar/ajustar la config y la identidad de marca.
-3. Si la fuente es nueva: implementar `src/adapters/<nicho>/` (solo `fetch` + `analyze`
-   → `ContentPayload`) y registrarlo en `src/adapters/registry.ts`. Si reutiliza una
-   fuente existente, ni eso.
-4. Añadir credenciales de las cuentas en secrets/`.env`.
-5. `npm run factory -- validate <id>` → pasar `status: active`.
+1. `npm run factory -- create --topic "<idea>"` → onboarding guiado: elige enfoque,
+   estilo y modelo, y escribe la config (draft) con un adapter declarativo. **Cero código.**
+2. Revisar la config, añadir claves en `.env` y las cuentas en secrets.
+3. `npm run factory -- run <id> --dry-run` para previsualizar.
+4. `npm run factory -- validate <id>` → poner `status: active`. El scheduler lo recoge.
 
-> Coste de un canal nuevo: **una config** (si la fuente existe) o **una config + un
-> adapter pequeño** (si es nueva). **Cero cambios en el núcleo.**
+> Coste de un canal nuevo: **describir la temática**. Para datos con feed propio, además
+> pegar la URL del JSON. Solo casos muy a medida justifican un adapter en código (como
+> `luz`). **Cero cambios en el núcleo.**
 
 ---
 

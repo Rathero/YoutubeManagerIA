@@ -55,6 +55,19 @@ program
   });
 
 program
+  .command("create")
+  .description("Guided, no-code onboarding: describe a topic → system guides model+style → runnable config")
+  .option("-t, --topic <topic>", "the niche idea (otherwise you'll be asked)")
+  .option("-l, --language <lang>", "language tag", "es-ES")
+  .option("-r, --region <region>", "region code", "ES")
+  .option("-o, --out <dir>", "output directory for the config", "src/config")
+  .option("-y, --yes", "non-interactive: accept all recommendations", false)
+  .action(async (opts: { topic?: string; language: string; region: string; out: string; yes?: boolean }) => {
+    const { runWizard } = await import("../genesis/wizard.js");
+    await runWizard({ topic: opts.topic, language: opts.language, region: opts.region, outDir: opts.out, yes: opts.yes });
+  });
+
+program
   .command("genesis")
   .description("Phase A: turn a topic into a draft ChannelDefinition + strategy report")
   .requiredOption("-t, --topic <topic>", "the niche idea")

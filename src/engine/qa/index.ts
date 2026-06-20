@@ -38,17 +38,29 @@ export function createQaStage(): Stage {
       const warnings: string[] = [];
       const payload = ctx.payload;
 
+      const contentKind = ctx.channel.niche.content_kind;
       if (!payload) {
         failures.push("no payload");
       } else {
-        if (!payload.safety.factsVerified) failures.push("facts not verified (safety.factsVerified=false)");
         if (!payload.headlineFact?.trim()) failures.push("empty headlineFact");
-        if (payload.keyMetrics.length < MIN_METRICS) {
-          failures.push(`too few metrics (${payload.keyMetrics.length} < ${MIN_METRICS}) — looks empty`);
-        }
         if (!payload.sourceRef?.name) failures.push("missing source attribution");
         if (payload.safety.riskNotes && payload.safety.riskNotes.length > 0) {
           failures.push(`risk notes require human review: ${payload.safety.riskNotes.join("; ")}`);
+        }
+
+        if (contentKind === "data") {
+          // Data channels must be grounded in fresh, verified numbers.
+          if (!payload.safety.factsVerified) failures.push("facts not verified (safety.factsVerified=false)");
+          if (payload.keyMetrics.length < MIN_METRICS) {
+            failures.push(`too few metrics (${payload.keyMetrics.length} < ${MIN_METRICS}) — looks empty`);
+          }
+        } else {
+          // Knowledge/story: LLM-authored. Require substance (a hook + at least one beat),
+          // not external metrics. Unverified facts are a warning, not a blocker.
+          if (payload.segments.length < 1) failures.push("empty body (no segments) — looks empty");
+          if (!payload.safety.factsVerified) {
+            warnings.push(`content_kind=${contentKind}: facts are LLM-authored/unverified — ensure AI disclosure`);
+          }
         }
       }
 

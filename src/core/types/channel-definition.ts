@@ -46,6 +46,8 @@ const MonetizationSchema = z.object({
   primary: z.enum(["affiliate", "adsense", "product", "mixed"]),
   affiliate_verticals: z.array(z.string()).default([]),
   product_idea: z.string().optional(),
+  /** Map of vertical → affiliate base URL. The best-matching one is auto-inserted + UTM'd. */
+  links: z.record(z.string()).default({}),
 });
 
 const NicheSchema = z.object({
@@ -212,10 +214,17 @@ const RenderSchema = z.object({
       enabled: z.boolean().default(true),
     })
     .default({ enabled: true }),
+  /** Free stock B-roll behind data-card renders (Pexels/Pixabay). */
+  broll: z
+    .object({
+      enabled: z.boolean().default(false),
+      provider: z.enum(["pexels", "pixabay", "none"]).default("none"),
+    })
+    .default({ enabled: false, provider: "none" }),
 });
 
 const PlatformSchema = z.object({
-  id: z.enum(["youtube", "tiktok", "instagram"]),
+  id: z.enum(["youtube", "tiktok", "instagram", "x", "bluesky", "linkedin"]),
   enabled: z.boolean().default(true),
   account_ref: z.string(),
   posts: z.array(FormatKind).default([]),

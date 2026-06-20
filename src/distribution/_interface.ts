@@ -1,4 +1,4 @@
-import type { PlatformMeta, PublishResult, RenderedAsset } from "../core/types/index.js";
+import type { PlatformId, PlatformMeta, PublishResult, RenderedAsset } from "../core/types/index.js";
 
 export interface AccountRef {
   /** secrets:// reference from the ChannelDefinition. */
@@ -12,7 +12,7 @@ export interface AccountRef {
  * the same (channel, date, format, platform) never publishes twice.
  */
 export interface Publisher {
-  readonly platform: "youtube" | "tiktok" | "instagram";
+  readonly platform: PlatformId;
   publish(input: {
     channelId: string;
     date: string;

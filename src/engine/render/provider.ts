@@ -16,6 +16,8 @@ export interface RenderRequest {
   outPath: string; // .mp4
   /** Optional .srt to burn into the video (when render.captions.burn_in). */
   captionsPath?: string;
+  /** Optional stock B-roll clip used as the background instead of a solid color. */
+  brollPath?: string;
 }
 
 export interface RenderResult {
@@ -73,11 +75,15 @@ export class FfmpegRenderEngine implements RenderEngine {
 
     const dur = Math.max(1, req.durationSec);
     const subs = req.captionsPath ? `,subtitles='${req.captionsPath.replace(/'/g, "\\'")}'` : "";
-    const cmd =
-      `ffmpeg -y -f lavfi -i color=c=${bg}:s=${w}x${h}:d=${dur} -i "${req.audioPath}" ` +
-      `-vf "drawtext=text='${headline}':fontcolor=${fg}:fontsize=${Math.round(w / 22)}:` +
-      `x=(w-text_w)/2:y=(h-text_h)/2:line_spacing=12${subs}" ` +
-      `-c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "${req.outPath}"`;
+    const text = `drawtext=text='${headline}':fontcolor=${fg}:fontsize=${Math.round(w / 22)}:x=(w-text_w)/2:y=(h-text_h)/2:line_spacing=12`;
+    const cmd = req.brollPath
+      ? // B-roll background: loop the clip, scale/crop to fill, overlay the headline.
+        `ffmpeg -y -stream_loop -1 -i "${req.brollPath}" -i "${req.audioPath}" ` +
+        `-map 0:v:0 -map 1:a:0 -t ${dur} ` +
+        `-vf "scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},${text}${subs}" ` +
+        `-c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "${req.outPath}"`
+      : `ffmpeg -y -f lavfi -i color=c=${bg}:s=${w}x${h}:d=${dur} -i "${req.audioPath}" ` +
+        `-vf "${text}${subs}" -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "${req.outPath}"`;
     await pexec(cmd);
     return { path: req.outPath, mimeType: "video/mp4", durationSec: dur };
   }

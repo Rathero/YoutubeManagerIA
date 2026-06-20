@@ -297,6 +297,23 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 
 ---
 
+## Crecimiento, ingresos y operación
+
+- **B-roll de stock gratis:** `render.broll.{enabled,provider}` (Pexels/Pixabay) pone un clip
+  de archivo de fondo bajo el data-card en vez de color plano (sin coste; fallback a color).
+- **Trend detection:** `factory trends [--source google|reddit --geo ES]`; el adapter
+  `generative` puede anclar el tema del día a una tendencia (`data.config.trends.enabled`).
+- **Cross-posting:** añade plataformas `x`, `bluesky`, `linkedin` a `platforms` y publica el
+  texto + enlace del vídeo (con credenciales; si no, cola *assisted*). Se publican **después**
+  del vídeo para incluir su URL.
+- **Afiliados contextual + UTM:** define `niche.monetization.links` (vertical→URL); el sistema
+  elige el enlace más relevante del día y lo inserta con UTM en descripciones y newsletter.
+- **Alertas:** Discord (`DISCORD_WEBHOOK_URL`) y/o Telegram en cada fallo (y éxito si
+  `FACTORY_ALERT_ON_SUCCESS=1`).
+- **Dashboard web:** `factory dashboard [--port 8787]` — canales, ejecuciones y coste, sin deps.
+
+---
+
 ## Añadir un canal nuevo (sin código)
 
 1. `npm run factory -- create --topic "<idea>"` → onboarding guiado: elige enfoque,

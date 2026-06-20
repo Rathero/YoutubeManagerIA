@@ -3,6 +3,7 @@ import { getAdapter } from "../adapters/registry.js";
 import { Orchestrator, type RunOutcome } from "../core/orchestrator/orchestrator.js";
 import type { ChannelDefinition, RunContext } from "../core/types/index.js";
 import { createLogger } from "../ops/logger.js";
+import { notifyRunOutcome } from "../ops/notify.js";
 import { toRunRecord, type Store } from "../storage/store.js";
 import { getStore } from "../storage/index.js";
 import { resolveLlmClient } from "./llm/client.js";
@@ -75,5 +76,15 @@ export async function runChannel(channel: ChannelDefinition, opts: RunOptions = 
   } else if (outcome.status === "failed") {
     await store.saveRun(toRunRecord(ctx, "failed", outcome.error.message));
   }
+
+  // Ops alert (no-op without a webhook/token).
+  const detail =
+    outcome.status === "completed"
+      ? `${(ctx.publications ?? []).filter((p) => p.status === "published" || p.status === "queued_assisted").length} salida(s)`
+      : outcome.status === "failed"
+        ? `${outcome.stage}: ${outcome.error.message}`
+        : (outcome as any).reason ?? "";
+  await notifyRunOutcome({ channelId: channel.id, date, status: outcome.status, detail }).catch(() => undefined);
+
   return outcome;
 }

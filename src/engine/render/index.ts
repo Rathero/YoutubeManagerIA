@@ -6,6 +6,7 @@ import type { LlmClient } from "../llm/client.js";
 import { getRenderEngine } from "./provider.js";
 import { renderGenerative } from "./generative.js";
 import { mixMusicInto } from "./music.js";
+import { getBrollProvider, fetchBroll, brollQuery } from "../broll/provider.js";
 
 /** Map a format to the aspect ratios it should be rendered in. */
 function aspectsForFormat(format: string, channelAspects: string[]): string[] {
@@ -37,6 +38,19 @@ export function createRenderStage(llm: LlmClient | null): Stage {
       const channelAspects = ctx.channel.render.aspect_ratios;
       const generative = isGenerative(ctx.channel) && Boolean(ctx.channel.video);
       const engine = generative ? null : await getRenderEngine(ctx.channel.render.engine);
+
+      // Optional free stock B-roll background (data-card path only).
+      let brollPath: string | undefined;
+      const broll = ctx.channel.render.broll;
+      if (!generative && broll.enabled && broll.provider !== "none" && ctx.payload) {
+        const provider = getBrollProvider(broll.provider);
+        if (provider) {
+          const query = brollQuery(ctx.payload, ctx.channel.niche.topic);
+          const path = join(dir, `broll.mp4`);
+          brollPath = (await fetchBroll(provider, query, path)) ?? undefined;
+          ctx.log("info", "broll fetched", { provider: provider.name, query, ok: Boolean(brollPath) });
+        }
+      }
 
       const rendered: RenderedAsset[] = [];
       for (const script of ctx.scripts) {
@@ -70,6 +84,7 @@ export function createRenderStage(llm: LlmClient | null): Stage {
             aspectRatio: aspect,
             outPath,
             captionsPath,
+            brollPath,
           });
           rendered.push({
             format: script.format,

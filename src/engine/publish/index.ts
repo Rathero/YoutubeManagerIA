@@ -1,6 +1,6 @@
 import type { Stage } from "../../core/pipeline/stage.js";
 import type { PublishResult, RenderedAsset } from "../../core/types/index.js";
-import { getPublisher } from "../../distribution/registry.js";
+import { getPublisher, TEXT_PLATFORMS } from "../../distribution/registry.js";
 import { emitOwnDistribution } from "../../distribution/own/newsletter.js";
 import type { Store } from "../../storage/store.js";
 
@@ -25,19 +25,32 @@ export function createPublishStage(store: Store): Stage {
       if (!ctx.metadata || !ctx.rendered) throw new Error("publish: missing metadata/rendered");
       const results: PublishResult[] = [];
 
-      for (const platform of ctx.channel.platforms) {
-        if (!platform.enabled) continue;
+      // Two passes: video platforms first, then text cross-posts (which get the link).
+      const enabled = ctx.channel.platforms.filter((p) => p.enabled);
+      const videoPlatforms = enabled.filter((p) => !TEXT_PLATFORMS.has(p.id));
+      const textPlatforms = enabled.filter((p) => TEXT_PLATFORMS.has(p.id));
+
+      for (const platform of [...videoPlatforms, ...textPlatforms]) {
         const publisher = getPublisher(platform.id);
+        const isText = TEXT_PLATFORMS.has(platform.id);
+        // The link to share = the best published video URL so far.
+        const link = results.find((r) => r.url)?.url;
         for (const meta of ctx.metadata.filter((m) => m.platform === platform.id)) {
+          if (isText && link) meta.extra = { ...meta.extra, link };
           const already = await store.isPublished(ctx.channel.id, ctx.date, meta.format, platform.id);
           if (already) {
             results.push({ platform: platform.id, format: meta.format, status: "skipped", message: "already published (idempotent)" });
             continue;
           }
-          const asset = pickAsset(ctx.rendered, meta.format, platform.id);
+          let asset = pickAsset(ctx.rendered, meta.format, platform.id);
           if (!asset) {
-            results.push({ platform: platform.id, format: meta.format, status: "failed", message: "no rendered asset" });
-            continue;
+            if (isText) {
+              // Text cross-posts don't need a video asset.
+              asset = { format: meta.format, aspectRatio: "", path: "", durationSec: 0, mimeType: "" };
+            } else {
+              results.push({ platform: platform.id, format: meta.format, status: "failed", message: "no rendered asset" });
+              continue;
+            }
           }
           const res = await publisher.publish({
             channelId: ctx.channel.id,

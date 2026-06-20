@@ -174,6 +174,32 @@ program
   });
 
 program
+  .command("trends")
+  .description("Show trending topics (Google Trends / Reddit) for a region")
+  .option("-s, --source <src>", "google | reddit", "google")
+  .option("-g, --geo <geo>", "region code (google)", "ES")
+  .action(async (opts: { source: any; geo: string }) => {
+    const { fetchTrends } = await import("../trends/index.js");
+    const trends = await fetchTrends(opts.source, opts.geo);
+    if (trends.length === 0) {
+      console.log("No se pudieron obtener tendencias (¿sin red?).");
+      return;
+    }
+    console.log(`\nTendencias (${opts.source}, ${opts.geo}):`);
+    trends.forEach((t, i) => console.log(`  ${String(i + 1).padStart(2)}. ${t}`));
+  });
+
+program
+  .command("dashboard")
+  .description("Serve a small web dashboard (channels, runs, cost)")
+  .option("-p, --port <port>", "port", "8787")
+  .action(async (opts: { port: string }) => {
+    const { startDashboard } = await import("../ops/dashboard.js");
+    startDashboard(Number(opts.port));
+    console.log(`Dashboard en http://localhost:${opts.port}  (Ctrl+C para salir)`);
+  });
+
+program
   .command("doctor")
   .description("Check which local servers (LLM/TTS/ComfyUI) and cloud keys are available")
   .action(async () => {

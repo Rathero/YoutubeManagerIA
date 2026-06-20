@@ -16,6 +16,7 @@ import { getLlmClient } from "../../engine/llm/client.js";
 interface GenerativeConfig {
   angles?: string[];
   require_sources?: boolean;
+  trends?: { enabled?: boolean; source?: "google" | "reddit"; geo?: string };
 }
 
 interface GenSeed {
@@ -94,11 +95,22 @@ class GenerativeAdapter implements NicheAdapter {
 
   async fetch(ctx: RunContext): Promise<RawData> {
     const cfg = (ctx.channel.data.config ?? {}) as GenerativeConfig;
-    const seed: GenSeed = {
-      date: ctx.date,
-      angle: pickAngle(cfg, ctx, ctx.date),
-      contentKind: ctx.channel.niche.content_kind,
-    };
+    let angle = pickAngle(cfg, ctx, ctx.date);
+    // Optionally anchor today's angle to a trending topic relevant to the niche.
+    if (cfg.trends?.enabled) {
+      try {
+        const { fetchTrends, pickRelevantTrend } = await import("../../trends/index.js");
+        const trends = await fetchTrends(cfg.trends.source ?? "google", cfg.trends.geo ?? ctx.channel.identity.region);
+        const t = pickRelevantTrend(trends, ctx.channel.niche.topic);
+        if (t) {
+          angle = `${ctx.channel.niche.topic}: ${t}`;
+          ctx.log("info", "trend-anchored angle", { trend: t });
+        }
+      } catch {
+        /* offline → keep base angle */
+      }
+    }
+    const seed: GenSeed = { date: ctx.date, angle, contentKind: ctx.channel.niche.content_kind };
     return seed;
   }
 

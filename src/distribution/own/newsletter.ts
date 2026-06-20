@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ChannelDefinition, ContentPayload, PublishResult } from "../../core/types/index.js";
 import { runDir } from "../../storage/paths.js";
+import { affiliateForRun } from "../../monetization/affiliate.js";
 
 /** A text/Markdown edition of the (already-structured) payload — algorithm-independent. */
 export function buildNewsletterMarkdown(channel: ChannelDefinition, payload: ContentPayload): string {
@@ -20,7 +21,13 @@ export function buildNewsletterMarkdown(channel: ChannelDefinition, payload: Con
   }
   if (payload.context) lines.push(payload.context, "");
   if (payload.cta) lines.push(`_${payload.cta}_`, "");
-  lines.push(`Fuente: ${payload.sourceRef.name}${payload.sourceRef.url ? ` (${payload.sourceRef.url})` : ""}`);
+  const aff = affiliateForRun(payload, channel.niche.monetization.links ?? {}, {
+    channelId: channel.id,
+    date: payload.date,
+    source: "newsletter",
+  });
+  if (aff) lines.push("", `🔗 ${aff.vertical}: ${aff.url}`);
+  lines.push("", `Fuente: ${payload.sourceRef.name}${payload.sourceRef.url ? ` (${payload.sourceRef.url})` : ""}`);
   return lines.join("\n");
 }
 

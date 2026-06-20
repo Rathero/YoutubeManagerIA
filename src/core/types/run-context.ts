@@ -41,8 +41,10 @@ export interface ThumbnailAsset {
   mimeType: string;
 }
 
+export type PlatformId = "youtube" | "tiktok" | "instagram" | "x" | "bluesky" | "linkedin";
+
 export interface PlatformMeta {
-  platform: "youtube" | "tiktok" | "instagram";
+  platform: PlatformId;
   format: FormatKind;
   title: string;
   description: string;
@@ -52,7 +54,7 @@ export interface PlatformMeta {
 }
 
 export interface PublishResult {
-  platform: "youtube" | "tiktok" | "instagram" | "newsletter" | "telegram";
+  platform: PlatformId | "newsletter" | "telegram";
   format: FormatKind;
   status: "published" | "queued_assisted" | "skipped" | "failed";
   externalId?: string;

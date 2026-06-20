@@ -5,6 +5,7 @@ import type {
   FormatKind,
   PlatformMeta,
 } from "../../core/types/index.js";
+import { affiliateForRun } from "../../monetization/affiliate.js";
 
 function slugHashtag(s: string): string {
   return (
@@ -130,12 +131,16 @@ export function createMetadataStage(): Stage {
         ctx.channel.formats.filter((f) => f.enabled).map((f) => f.kind),
       );
 
+      const links = ctx.channel.niche.monetization.links ?? {};
       const metas: PlatformMeta[] = [];
       for (const platform of ctx.channel.platforms) {
         if (!platform.enabled) continue;
         for (const format of platform.posts) {
           if (!enabledFormats.has(format)) continue;
           const meta = buildMeta(ctx.channel, payload, platform.id, format, ctx.date);
+          // Contextual affiliate link (+UTM) appended to the description.
+          const aff = affiliateForRun(payload, links, { channelId: ctx.channel.id, date: ctx.date, source: platform.id });
+          if (aff) meta.description = `${meta.description}\n\n🔗 ${aff.vertical}: ${aff.url}`.slice(0, 4900);
           // Attach the per-format thumbnail + captions so publishers/assisted bundles use them.
           const thumb = ctx.thumbnails?.find((t) => t.format === format);
           const caption = ctx.captions?.find((c) => c.format === format);

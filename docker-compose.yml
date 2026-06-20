@@ -1,0 +1,100 @@
+# Channel Factory — full 24/7 stack in one command.
+#
+#   docker compose up -d --build                 # worker + Postgres + Redis
+#   docker compose --profile ai up -d --build    # + local LLM (Ollama) & TTS (Kokoro)
+#   docker compose --profile gpu up -d --build   # + ComfyUI (image/video, needs GPU)
+#
+# Configure which channels the worker runs via FACTORY_CHANNELS (default: luz-es).
+# Secrets/keys come from your .env (git-ignored). Local AI services are reached by
+# their service names (ollama/kokoro/comfyui) when their profile is enabled.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cf-postgres
+    environment:
+      POSTGRES_USER: factory
+      POSTGRES_PASSWORD: factory
+      POSTGRES_DB: factory
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U factory"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: cf-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: cf-worker
+    command: ["dist/ops/cli.js", "worker", "${FACTORY_CHANNELS:-luz-es}"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      FACTORY_STORE: postgres
+      DATABASE_URL: postgres://factory:factory@postgres:5432/factory
+      REDIS_URL: redis://redis:6379
+      # Local AI endpoints (used if the `ai`/`gpu` profiles are running; else fallback).
+      FACTORY_LOCAL_LLM_URL: ${FACTORY_LOCAL_LLM_URL:-http://ollama:11434/v1}
+      FACTORY_LOCAL_TTS_URL: ${FACTORY_LOCAL_TTS_URL:-http://kokoro:8880/v1}
+      FACTORY_COMFYUI_URL: ${FACTORY_COMFYUI_URL:-http://comfyui:8188}
+    volumes:
+      - out:/app/out
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Local AI (optional) ─────────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: cf-ollama
+    profiles: ["ai"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: cf-kokoro
+    profiles: ["ai"]
+    ports:
+      - "8880:8880"
+    restart: unless-stopped
+
+  comfyui:
+    image: yanwk/comfyui-boot:latest
+    container_name: cf-comfyui
+    profiles: ["gpu"]
+    ports:
+      - "8188:8188"
+    volumes:
+      - comfyui:/root
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - { driver: nvidia, count: all, capabilities: [gpu] }
+
+volumes:
+  pgdata:
+  out:
+  ollama:
+  comfyui:

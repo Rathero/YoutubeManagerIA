@@ -12,10 +12,39 @@ export interface ServiceStatus {
 
 export interface LocalReport {
   llm: ServiceStatus;
+  /** Configured local model + whether it's actually downloaded/loaded. */
+  llmModel: { name: string; present: boolean; available: string[] };
   tts: ServiceStatus;
   comfyui: ServiceStatus;
   ffmpeg: ServiceStatus;
   cloud: ServiceStatus[];
+}
+
+export function localLlmModel(): string {
+  return process.env.FACTORY_LOCAL_LLM_MODEL ?? "qwen3";
+}
+
+/** List model ids from an OpenAI-compatible /models endpoint (Ollama, etc.). */
+async function listLocalModels(timeoutMs = 1500): Promise<string[]> {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${localLlmUrl()}/models`, { signal: ac.signal });
+    if (!res.ok) return [];
+    const j = (await res.json()) as { data?: any[]; models?: any[] };
+    const arr = j.data ?? j.models ?? [];
+    return arr.map((m: any) => m.id ?? m.name ?? m.model).filter(Boolean);
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** True when `want` matches an available model id (ignoring the :tag). */
+export function modelPresent(want: string, available: string[]): boolean {
+  const base = (s: string) => s.split(":")[0];
+  return available.some((id) => id === want || base(id) === base(want));
 }
 
 export function localLlmUrl(): string {
@@ -68,6 +97,10 @@ export async function probeLocalServices(): Promise<LocalReport> {
   ]);
   llmReachableCache = llmUp;
 
+  const wantModel = localLlmModel();
+  const available = llmUp ? await listLocalModels() : [];
+  const present = modelPresent(wantModel, available);
+
   const cloudKey = (name: string, env: string[]): ServiceStatus => ({
     name,
     ok: env.some((e) => Boolean(process.env[e])),
@@ -76,6 +109,7 @@ export async function probeLocalServices(): Promise<LocalReport> {
 
   return {
     llm: { name: "LLM local (Ollama/OpenAI-compat)", url: localLlmUrl(), ok: llmUp, detail: llmUp ? "online" : "offline → fallback determinista" },
+    llmModel: { name: wantModel, present, available },
     tts: { name: "TTS local (Kokoro/LocalAI)", url: localTtsUrl(), ok: ttsUp, detail: ttsUp ? "online" : "offline → stub voz" },
     comfyui: { name: "ComfyUI (imagen/vídeo)", url: comfyuiUrl(), ok: comfyUp, detail: comfyUp ? "online" : "offline → stub" },
     ffmpeg: { name: "ffmpeg", ok: ffmpegOk, detail: ffmpegOk ? "instalado" : "ausente → render como manifest" },
@@ -98,7 +132,15 @@ export async function runDoctor(): Promise<void> {
   const r = await probeLocalServices();
   console.log("\nChannel Factory — diagnóstico\n");
   console.log("Modelos LOCALES ($0):");
-  for (const s of [r.llm, r.tts, r.comfyui]) {
+  console.log(`  ${mark(r.llm.ok)} ${r.llm.name.padEnd(34)} ${r.llm.url ?? ""}  — ${r.llm.detail}`);
+  if (r.llm.ok) {
+    const m = r.llmModel;
+    const detail = m.present
+      ? `descargado (${m.available.length} modelo/s disponibles)`
+      : `NO descargado → ejecuta:  ollama pull ${m.name}`;
+    console.log(`  ${mark(m.present)} modelo "${m.name}"${" ".repeat(Math.max(1, 24 - m.name.length))}${detail}`);
+  }
+  for (const s of [r.tts, r.comfyui]) {
     console.log(`  ${mark(s.ok)} ${s.name.padEnd(34)} ${s.url ?? ""}  — ${s.detail}`);
   }
   console.log(`  ${mark(r.ffmpeg.ok)} ${r.ffmpeg.name.padEnd(34)} ${"".padEnd(0)}  — ${r.ffmpeg.detail}`);
@@ -112,8 +154,14 @@ export async function runDoctor(): Promise<void> {
     console.log("Sin proveedores activos: el pipeline corre en modo stub (todo offline).");
     console.log("→ Para un stack local gratis:  npm run setup:local");
   } else {
-    if (r.llm.ok) console.log("Texto: usará el LLM local automáticamente (auto local-first).");
-    else if (anyCloud) console.log("Texto: usará un proveedor cloud (hay clave).");
+    if (r.llm.ok && !r.llmModel.present) {
+      console.log(`⚠ El servidor LLM está activo pero falta el modelo "${r.llmModel.name}".`);
+      console.log(`→ Descárgalo:  ollama pull ${r.llmModel.name}`);
+    } else if (r.llm.ok) {
+      console.log("Texto: usará el LLM local automáticamente (auto local-first).");
+    } else if (anyCloud) {
+      console.log("Texto: usará un proveedor cloud (hay clave).");
+    }
     console.log("Listo para generar. Crea un canal local con:  npm run factory -- create --topic \"...\" --local");
   }
   console.log("");

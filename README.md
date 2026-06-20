@@ -183,6 +183,26 @@ npm run factory -- create --topic "curiosidades de la historia" --local
 plano + Ken Burns, lo más barato). Ejemplo listo: `src/config/historia-local.yaml`.
 Workflows de ComfyUI editables en `comfyui-workflows/`.
 
+### Operación 24/7 (un solo comando)
+
+Stack completo en Docker — **worker (BullMQ) + Postgres + Redis**, con perfiles opcionales
+para la IA local:
+
+```bash
+docker compose up -d --build                  # worker + Postgres + Redis
+docker compose --profile ai up -d --build     # + Ollama (LLM) y Kokoro (TTS) locales
+docker compose --profile gpu up -d --build    # + ComfyUI (imagen/vídeo, requiere GPU)
+# atajos npm: stack:up · stack:up:ai · stack:down · stack:logs
+```
+
+- El `worker` programa y ejecuta los canales `active` (trigger con data-gate / cron),
+  aislado por canal e idempotente. Elige qué canales corre con `FACTORY_CHANNELS`
+  (por defecto `luz-es`): `FACTORY_CHANNELS="luz-es historia-local" docker compose up -d`.
+- Usa **Postgres** (`FACTORY_STORE=postgres`) y **Redis** automáticamente; los media van a
+  un volumen `out`. Las claves cloud salen de tu `.env`; la IA local se resuelve por nombre
+  de servicio (`ollama`/`kokoro`/`comfyui`) cuando su perfil está activo.
+- Logs en vivo: `docker compose logs -f worker` (o `npm run stack:logs`).
+
 ### Vídeo generativo con IA + estilos
 
 Pon `render.engine: generative` y una sección `video` en la config:
@@ -254,7 +274,8 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 - **M3 — Multiplataforma:** ✅ publishers YT/TikTok/IG con modos `auto`/`assisted` y
   variantes de copy/hashtags por plataforma.
 - **M4 — Cola + estado:** ✅ store **Postgres** (`PostgresStore`) además del JSON, y
-  **worker BullMQ** (`factory worker`, lazy-import). Selección por env.
+  **worker BullMQ** (`factory worker`, lazy-import). Stack 24/7 en `docker compose up`
+  (worker + Postgres + Redis, perfiles `ai`/`gpu` para IA local).
 - **M5 — Genesis:** ✅ `topic` → ChannelDefinition draft + informe + viability score, ahora
   con preferencias de proveedor/estilo (`--text-provider`, `--voice-provider`, `--video`,
   `--video-provider`, `--style`).

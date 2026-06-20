@@ -17,6 +17,10 @@
     "setup:local": "bash scripts/setup-local.sh",
     "local:up": "docker compose -f docker-compose.local.yml up -d ollama kokoro",
     "local:down": "docker compose -f docker-compose.local.yml down",
+    "stack:up": "docker compose up -d --build",
+    "stack:up:ai": "docker compose --profile ai up -d --build",
+    "stack:down": "docker compose down",
+    "stack:logs": "docker compose logs -f worker",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -90,23 +90,37 @@ const ScriptSchema = z.object({
   prompt_template: z.string(),
   max_words: z.record(z.number().int().positive()).default({}),
   language_rules: z.string().optional(),
-  /** Text/LLM provider for script + metadata. Falls back to env, then deterministic. */
+  /**
+   * Text/LLM provider for script + metadata. "local"/"ollama" use a self-hosted
+   * OpenAI-compatible server (Ollama, LM Studio, llama.cpp, vLLM) → $0 inference.
+   * Falls back to env, then deterministic.
+   */
   provider: z
     .object({
-      name: z.enum(["anthropic", "openai", "gemini", "auto"]).default("auto"),
+      name: z.enum(["anthropic", "openai", "gemini", "local", "ollama", "auto"]).default("auto"),
       model: z.string().optional(),
+      /** Override base URL for local/OpenAI-compatible servers. */
+      base: z.string().optional(),
     })
     .default({ name: "auto" }),
 });
 
 const VoiceSchema = z.object({
+  /**
+   * "local"/"kokoro" = self-hosted OpenAI-compatible TTS (Kokoro/Speaches/LocalAI);
+   * "piper" = local Piper binary. Both run offline for $0.
+   */
   provider: z
-    .enum(["elevenlabs", "openai", "google", "azure", "piper", "stub"])
+    .enum(["elevenlabs", "openai", "google", "local", "kokoro", "azure", "piper", "stub"])
     .default("stub"),
   voice_id: z.string().optional(),
   speed: z.number().positive().default(1),
-  /** Provider model id (e.g. ElevenLabs "eleven_v3", OpenAI "gpt-4o-mini-tts"). */
+  /** Provider model id (e.g. ElevenLabs "eleven_v3", OpenAI "gpt-4o-mini-tts", "kokoro"). */
   model_id: z.string().optional(),
+  /** Local Piper voice model path (.onnx). */
+  model_path: z.string().optional(),
+  /** Override base URL for local OpenAI-compatible TTS servers. */
+  base: z.string().optional(),
   /** Realism/expressiveness knobs (provider-dependent; 0..1). */
   stability: z.number().min(0).max(1).optional(),
   similarity: z.number().min(0).max(1).optional(),
@@ -131,13 +145,30 @@ const CustomStyleSchema = z.object({
   photoreal: z.boolean().default(false),
 });
 
+/**
+ * Local image generation (FLUX/SDXL via ComfyUI, or cloud). Enables the cheap
+ * "images" video mode: one AI image per shot, animated with a Ken Burns pan/zoom.
+ */
+const ImageSchema = z.object({
+  provider: z.enum(["comfyui", "openai", "stub"]).default("stub"),
+  model: z.string().optional(),
+  /** ComfyUI API-format workflow template (with {{PROMPT}}/{{WIDTH}}… tokens). */
+  workflow: z.string().optional(),
+  negative: z.string().optional(),
+});
+
 const VideoSchema = z.object({
-  /** data_card = rendered data graphics; generative = AI-generated footage. */
-  mode: z.enum(["data_card", "generative"]).default("data_card"),
-  provider: z.enum(["veo", "sora", "runway", "stub"]).default("stub"),
+  /**
+   * data_card  = rendered data graphics
+   * generative = AI-generated footage (Veo/Sora/Runway, or local Wan/LTX/Hunyuan via ComfyUI)
+   * images     = AI still per shot (FLUX/SDXL) animated with Ken Burns — cheapest, great local
+   */
+  mode: z.enum(["data_card", "generative", "images"]).default("data_card"),
+  /** "comfyui" = local video models (Wan 2.2 / LTX-Video / HunyuanVideo) for $0. */
+  provider: z.enum(["veo", "sora", "runway", "comfyui", "stub"]).default("stub"),
   /** Built-in or custom style key. e.g. realistic | cinematic | anime | manga | comic | cartoon3d | claymation | pixelart | watercolor */
   style: z.string().default("realistic"),
-  /** Seconds per generated clip (most providers cap ~4-12s). */
+  /** Seconds per generated clip/shot. */
   clip_seconds: z.number().int().positive().default(8),
   resolution: z.enum(["720p", "1080p", "4k"]).default("1080p"),
   /** Use the video model's own generated audio (Veo) instead of TTS. */
@@ -146,6 +177,8 @@ const VideoSchema = z.object({
   max_clips: z.number().int().positive().default(6),
   /** LLM-built storyboard, or deterministic split when false/no LLM. */
   llm_storyboard: z.boolean().default(true),
+  /** ComfyUI text→video workflow template path (for provider: comfyui). */
+  workflow: z.string().optional(),
   custom_styles: z.record(CustomStyleSchema).default({}),
 });
 
@@ -203,6 +236,7 @@ export const ChannelDefinitionSchema = z.object({
   voice: VoiceSchema,
   render: RenderSchema,
   video: VideoSchema.optional(),
+  image: ImageSchema.optional(),
   platforms: z.array(PlatformSchema).default([]),
   distribution_own: z
     .object({
@@ -222,5 +256,6 @@ export type ChannelDefinition = z.infer<typeof ChannelDefinitionSchema>;
 export type Platform = z.infer<typeof PlatformSchema>;
 export type Format = z.infer<typeof FormatSchema>;
 export type VideoConfig = z.infer<typeof VideoSchema>;
+export type ImageConfig = z.infer<typeof ImageSchema>;
 export type CustomStyle = z.infer<typeof CustomStyleSchema>;
 export type VoiceConfig = z.infer<typeof VoiceSchema>;

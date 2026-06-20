@@ -24,6 +24,8 @@ export interface BuildOptions {
   language?: string;
   region?: string;
   httpFeed?: HttpFeed;
+  /** Fully-local, $0 stack: Ollama text + Kokoro voice + ComfyUI images. */
+  local?: boolean;
 }
 
 /**
@@ -62,10 +64,13 @@ export function buildDefinitionFromRecommendation(
     structure: kind === "short" ? ["hook", "dato_clave", "cuerpo", "cta"] : ["intro", "desarrollo", "contexto", "consejo", "cta"],
   }));
 
-  const voice =
-    rec.voiceProvider === "elevenlabs"
+  const local = Boolean(opts.local);
+  const voice = local
+    ? { provider: "kokoro" as const, voice_id: "af_sky", model_id: "kokoro", speed: 1.0 }
+    : rec.voiceProvider === "elevenlabs"
       ? { provider: "elevenlabs" as const, voice_id: "<tu_voice_id>", model_id: "eleven_v3", speed: 1.0, stability: 0.4, similarity: 0.85 }
       : { provider: rec.voiceProvider, speed: 1.0 };
+  const textProviderName = local ? ("local" as const) : rec.textProvider;
 
   const draft = {
     id,
@@ -103,7 +108,7 @@ export function buildDefinitionFromRecommendation(
       prompt_template: `src/templates/generic/script.md`,
       max_words: { short: 110, long: 420 },
       language_rules: `${language}, frases cortas`,
-      provider: { name: rec.textProvider },
+      provider: { name: textProviderName },
     },
     voice,
     render: {
@@ -114,16 +119,27 @@ export function buildDefinitionFromRecommendation(
     },
     ...(generative
       ? {
+          // Local default = "images" mode (FLUX/SDXL stills + Ken Burns): cheapest & local-friendly.
           video: {
-            mode: "generative" as const,
-            provider: rec.videoProvider,
+            mode: local ? ("images" as const) : ("generative" as const),
+            provider: local ? ("comfyui" as const) : rec.videoProvider,
             style: rec.style,
             clip_seconds: 8,
             resolution: "1080p" as const,
             use_native_audio: false,
             max_clips: 5,
             llm_storyboard: true,
+            ...(local ? { workflow: "comfyui-workflows/wan-video.json" } : {}),
           },
+          ...(local
+            ? {
+                image: {
+                  provider: "comfyui" as const,
+                  workflow: "comfyui-workflows/sdxl-image.json",
+                  negative: "text, watermark, low quality, deformed",
+                },
+              }
+            : {}),
         }
       : {}),
     platforms: [
@@ -149,6 +165,8 @@ interface WizardOptions {
   outDir?: string;
   /** Non-interactive: accept every recommendation. */
   yes?: boolean;
+  /** Fully-local, $0 stack (Ollama + Kokoro + ComfyUI). */
+  local?: boolean;
 }
 
 /**
@@ -193,10 +211,19 @@ export async function runWizard(opts: WizardOptions): Promise<WizardResult> {
     const styleKeys = [rec.style, ...Object.keys(BUILT_IN_STYLES).filter((k) => k !== rec.style), "data_card"];
     rec.style = await choose("Estilo visual", styleKeys, rec.style);
     rec.videoMode = rec.style === "data_card" || rec.contentKind === "data" ? "data_card" : "generative";
-    if (rec.videoMode === "generative") {
-      rec.videoProvider = (await choose("Modelo de vídeo", ["veo", "sora", "runway"], rec.videoProvider)) as any;
+
+    // Cloud (pago, máxima calidad) vs Local ($0, Ollama+Kokoro+ComfyUI).
+    const infra = opts.local ? "local" : await choose("Infraestructura de IA", ["cloud", "local"], "cloud");
+    const local = infra === "local";
+
+    if (!local) {
+      if (rec.videoMode === "generative") {
+        rec.videoProvider = (await choose("Modelo de vídeo", ["veo", "sora", "runway"], rec.videoProvider)) as any;
+      }
+      rec.voiceProvider = (await choose("Proveedor de voz", ["elevenlabs", "openai", "google"], rec.voiceProvider)) as any;
+    } else {
+      console.log("  → Local: texto=Ollama, voz=Kokoro, imágenes=ComfyUI (FLUX/SDXL). Coste de IA: 0€.");
     }
-    rec.voiceProvider = (await choose("Proveedor de voz", ["elevenlabs", "openai", "google"], rec.voiceProvider)) as any;
     const fmt = await choose("Formatos", ["short", "short+long"], rec.formats.length > 1 ? "short+long" : "short");
     rec.formats = fmt === "short+long" ? ["short", "long"] : ["short"];
     rec.adapter = rec.contentKind === "data" ? "http" : "generative";
@@ -220,7 +247,7 @@ export async function runWizard(opts: WizardOptions): Promise<WizardResult> {
     const region = await ask("Región", opts.region ?? "ES");
     const language = await ask("Idioma", opts.language ?? "es-ES");
 
-    const definition = buildDefinitionFromRecommendation(topic, rec, { language, region, httpFeed });
+    const definition = buildDefinitionFromRecommendation(topic, rec, { language, region, httpFeed, local });
     const dir = resolve(process.cwd(), opts.outDir ?? "src/config");
     await mkdir(dir, { recursive: true });
     const path = resolve(dir, `${definition.id}.yaml`);

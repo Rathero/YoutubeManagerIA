@@ -2,7 +2,7 @@ import { join } from "node:path";
 import type { Stage } from "../../core/pipeline/stage.js";
 import type { AudioAsset } from "../../core/types/index.js";
 import { runDir } from "../../storage/paths.js";
-import { getTtsProvider, hashText } from "./provider.js";
+import { getTtsProvider, hashText, StubTtsProvider } from "./provider.js";
 
 /**
  * Stage 4 — Voice. One audio track per format. Cache key = hash of narration text,
@@ -20,16 +20,26 @@ export function createVoiceStage(): Stage {
       }
       const dir = join(runDir(ctx.channel.id, ctx.date), "audio");
 
+      const stub = new StubTtsProvider(ctx.channel.voice.speed);
       const audio: AudioAsset[] = [];
       for (const script of ctx.scripts) {
         const textHash = hashText(script.narration);
         const outPath = join(dir, `${script.format}-${textHash}.audio`);
-        const res = await provider.synthesize({ text: script.narration, outPath });
+        let res;
+        let usedStub = provider.name === "stub";
+        try {
+          res = await provider.synthesize({ text: script.narration, outPath });
+        } catch (err) {
+          // A configured provider failed at call time (e.g. local server down) → stub.
+          ctx.log("warn", `voice provider "${provider.name}" failed; using stub`, { error: (err as Error).message });
+          res = await stub.synthesize({ text: script.narration, outPath });
+          usedStub = true;
+        }
         audio.push({
           format: script.format,
           path: res.path,
           durationSec: res.durationSec,
-          loudnessLufs: provider.name === "stub" ? -14 : undefined,
+          loudnessLufs: usedStub ? -14 : undefined,
           textHash: res.textHash,
         });
       }

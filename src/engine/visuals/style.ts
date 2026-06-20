@@ -136,7 +136,7 @@ export interface VideoPrompt {
  * single cinematic paragraph; Runway likes concise keyword-rich text).
  */
 export function buildVideoPrompt(
-  provider: "veo" | "sora" | "runway" | "stub",
+  provider: "veo" | "sora" | "runway" | "comfyui" | "stub",
   shot: Shot,
   style: StyleDescriptor,
   aspectRatio: string,

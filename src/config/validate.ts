@@ -40,11 +40,28 @@ export async function validateChannel(channel: ChannelDefinition): Promise<Valid
     errors.push("no enabled formats");
   }
 
-  // Generative video config sanity.
-  const generative = channel.render.engine === "generative" || channel.video?.mode === "generative";
+  // Generative video config sanity (data_card/generative/images all routed via video).
+  const generative =
+    channel.render.engine === "generative" ||
+    channel.video?.mode === "generative" ||
+    channel.video?.mode === "images";
   if (generative) {
     if (!channel.video) {
       errors.push("render.engine=generative requires a `video` section");
+    } else if (channel.video.mode === "images") {
+      // Cheap image path. Check the image provider.
+      const img = channel.image;
+      if (!img) warnings.push("video.mode=images but no `image` section — will use stub stills");
+      else if (img.provider === "comfyui") {
+        if (!img.workflow) warnings.push("image.provider=comfyui but no workflow set — will use stub stills");
+        else if (!(await exists(img.workflow))) warnings.push(`image workflow "${img.workflow}" not found`);
+        else warnings.push(`image.provider=comfyui → ComfyUI at ${process.env.FACTORY_COMFYUI_URL ?? "http://localhost:8188"} (stub if unreachable)`);
+      } else if (img.provider === "openai" && !process.env.OPENAI_API_KEY) {
+        warnings.push("image.provider=openai but OPENAI_API_KEY not set — will use stub stills");
+      }
+    } else if (channel.video.provider === "comfyui") {
+      if (!channel.video.workflow) warnings.push("video.provider=comfyui but no workflow set — will use stub clips");
+      else warnings.push(`video.provider=comfyui → ComfyUI at ${process.env.FACTORY_COMFYUI_URL ?? "http://localhost:8188"} (stub if unreachable)`);
     } else {
       const keyByProvider: Record<string, string> = {
         veo: "GEMINI_API_KEY/GOOGLE_API_KEY",
@@ -62,9 +79,20 @@ export async function validateChannel(channel: ChannelDefinition): Promise<Valid
     }
   }
 
-  // Realistic-voice provider key hints.
+  // Voice provider hints (cloud keys / local servers).
   if (channel.voice.provider === "elevenlabs" && !process.env.ELEVENLABS_API_KEY) {
     warnings.push("voice.provider=elevenlabs but ELEVENLABS_API_KEY not set — will use stub voice");
+  }
+  if ((channel.voice.provider === "local" || channel.voice.provider === "kokoro")) {
+    warnings.push(`voice.provider=${channel.voice.provider} → local TTS at ${process.env.FACTORY_LOCAL_TTS_URL ?? "http://localhost:8880/v1"} (stub if unreachable)`);
+  }
+  if (channel.voice.provider === "piper" && !channel.voice.model_path) {
+    warnings.push("voice.provider=piper but no model_path set — will use stub voice");
+  }
+
+  // Local text provider hint.
+  if (channel.script.provider.name === "local" || channel.script.provider.name === "ollama") {
+    warnings.push(`text provider=local → ${channel.script.provider.base ?? process.env.FACTORY_LOCAL_LLM_URL ?? "http://localhost:11434/v1"} (deterministic fallback if unreachable)`);
   }
 
   const enabledPlatforms = channel.platforms.filter((p) => p.enabled);

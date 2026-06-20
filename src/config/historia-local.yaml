@@ -1,0 +1,96 @@
+id: historia-local
+status: active
+version: 1
+
+# Ejemplo de stack 100% LOCAL ($0 de IA): texto con Ollama, voz con Kokoro,
+# imágenes con ComfyUI (FLUX/SDXL) animadas con Ken Burns. Sin escribir código.
+# Levanta: Ollama (11434), un servidor Kokoro OpenAI-compat (8880) y ComfyUI (8188).
+# Sin esos servidores, cada paso cae a un stub y el pipeline corre igualmente.
+
+identity:
+  name: "Curiosidades de la Historia"
+  language: es-ES
+  region: ES
+  brand:
+    palette: { bg: "#0b1220", fg: "#ffffff", accent: "#b45309" }
+    fonts: { heading: "Inter", body: "Inter" }
+    visual_template: "data-card-v1"
+  voice_persona:
+    description: "Narrador cercano y evocador. Engancha desde la primera frase."
+    do: ["abrir con un gancho", "ritmo ágil"]
+    dont: ["clickbait", "relleno"]
+
+niche:
+  topic: "curiosidades y episodios poco conocidos de la historia universal"
+  audience: "curiosos de la historia que quieren aprender en 1 minuto"
+  value_proposition: "una historia fascinante y verídica cada día"
+  monetization: { primary: affiliate, affiliate_verticals: ["libros de historia", "cursos online"] }
+  content_kind: story
+
+data:
+  adapter: generative            # sin código: el LLM crea el contenido del día
+  freshness: { type: evergreen, confirm_field: ready }
+  config:
+    angles:
+      - "el incidente que casi provoca una guerra por un error de traducción"
+      - "la mujer que dirigió un imperio en la sombra"
+      - "el invento accidental que cambió el mundo"
+
+formats:
+  - kind: short
+    enabled: true
+    target_seconds: 45
+    structure: ["hook", "desarrollo", "giro", "cierre"]
+
+script:
+  prompt_template: "src/templates/generic/script.md"
+  max_words: { short: 120 }
+  language_rules: "es-ES, frases cortas, tono narrativo"
+  provider: { name: local }      # Ollama u otro OpenAI-compatible local
+
+voice:
+  provider: kokoro               # servidor TTS local OpenAI-compatible (Kokoro)
+  voice_id: "af_sky"
+  model_id: "kokoro"
+  speed: 1.0
+
+render:
+  engine: generative
+  aspect_ratios: ["9:16"]
+  music: { enabled: false }
+
+video:
+  mode: images                   # 1 imagen IA por plano + Ken Burns (lo más barato)
+  provider: comfyui
+  style: cinematic
+  clip_seconds: 6
+  resolution: "1080p"
+  max_clips: 5
+  llm_storyboard: true
+
+image:
+  provider: comfyui              # FLUX/SDXL local vía ComfyUI
+  workflow: "comfyui-workflows/sdxl-image.json"
+  negative: "text, watermark, low quality, deformed, extra fingers"
+
+platforms:
+  - id: youtube
+    enabled: true
+    account_ref: "secrets://youtube/historia-local"
+    posts: ["short"]
+    publish_times: { short: "20:00" }
+    mode: assisted
+  - id: tiktok
+    enabled: true
+    account_ref: "secrets://tiktok/historia-local"
+    posts: ["short"]
+    publish_times: { short: "20:05" }
+    mode: assisted
+
+schedule:
+  timezone: "Europe/Madrid"
+  trigger: { type: pure_cron, at: "19:00" }
+
+kpis:
+  targets: { short_retention_pct: 55 }
+  review_after_days: 28

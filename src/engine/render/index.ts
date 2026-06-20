@@ -14,7 +14,11 @@ function aspectsForFormat(format: string, channelAspects: string[]): string[] {
 }
 
 function isGenerative(channel: { render: { engine: string }; video?: { mode: string } }): boolean {
-  return channel.render.engine === "generative" || channel.video?.mode === "generative";
+  return (
+    channel.render.engine === "generative" ||
+    channel.video?.mode === "generative" ||
+    channel.video?.mode === "images"
+  );
 }
 
 /**

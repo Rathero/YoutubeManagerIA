@@ -9,8 +9,9 @@ export interface LlmClient {
 }
 
 export interface LlmProviderConfig {
-  name?: "anthropic" | "openai" | "gemini" | "auto";
+  name?: "anthropic" | "openai" | "gemini" | "local" | "ollama" | "auto";
   model?: string;
+  base?: string;
 }
 
 /** Anthropic Claude — Messages API over fetch. */
@@ -88,25 +89,60 @@ class GeminiClient implements LlmClient {
   }
 }
 
+/**
+ * Local LLM — any OpenAI-compatible server (Ollama, LM Studio, llama.cpp, vLLM).
+ * Zero API cost. No key required; reachability is checked at call time (callers fall
+ * back to deterministic generation on error). Default points at Ollama.
+ */
+class LocalLlmClient implements LlmClient {
+  readonly name = "local";
+  constructor(
+    private readonly model = process.env.FACTORY_LOCAL_LLM_MODEL ?? "qwen3",
+    private readonly base = process.env.FACTORY_LOCAL_LLM_URL ?? "http://localhost:11434/v1",
+  ) {}
+  async complete(input: { system: string; user: string; maxTokens?: number }): Promise<string> {
+    const res = await fetch(`${this.base}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer local" },
+      body: JSON.stringify({
+        model: this.model,
+        max_tokens: input.maxTokens ?? 1024,
+        messages: [
+          { role: "system", content: input.system },
+          { role: "user", content: input.user },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Local LLM ${res.status}: ${await res.text()}`);
+    const json = (await res.json()) as { choices: Array<{ message: { content: string } }> };
+    return (json.choices[0]?.message.content ?? "").trim();
+  }
+}
+
 function anthropicKey() { return process.env.ANTHROPIC_API_KEY ?? ""; }
 function openaiKey() { return process.env.OPENAI_API_KEY ?? ""; }
 function geminiKey() { return process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? ""; }
+/** Local is "enabled" for auto-selection when a local URL/flag is set. */
+function localEnabled() { return Boolean(process.env.FACTORY_LOCAL_LLM_URL || process.env.FACTORY_LOCAL_LLM === "1"); }
 
 /**
- * Returns a configured LLM client, or null when none is available.
- * Honors an explicit provider; "auto"/unset tries anthropic → openai → gemini.
+ * Returns a configured LLM client, or null when none is available. Honors an explicit
+ * provider ("local"/"ollama" = self-hosted, $0); "auto" tries anthropic → openai →
+ * gemini → local (if FACTORY_LOCAL_LLM[_URL] is set).
  */
 export function getLlmClient(config?: LlmProviderConfig): LlmClient | null {
   const name = config?.name ?? "auto";
   const model = config?.model;
 
+  if (name === "local" || name === "ollama") return new LocalLlmClient(model, config?.base);
   if (name === "anthropic") return anthropicKey() ? new AnthropicClient(anthropicKey(), model) : null;
   if (name === "openai") return openaiKey() ? new OpenAIClient(openaiKey(), model) : null;
   if (name === "gemini") return geminiKey() ? new GeminiClient(geminiKey(), model) : null;
 
-  // auto: first available
+  // auto: first available (cloud keys first, then local if enabled)
   if (anthropicKey()) return new AnthropicClient(anthropicKey(), model);
   if (openaiKey()) return new OpenAIClient(openaiKey(), model);
   if (geminiKey()) return new GeminiClient(geminiKey(), model);
+  if (localEnabled()) return new LocalLlmClient(model, config?.base);
   return null;
 }

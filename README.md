@@ -137,29 +137,52 @@ Todo es **swappable por config** y cada categoría cae a un *stub* determinista 
 la clave, así que el pipeline **corre entero offline**. Los 3 proveedores top de cada
 industria vienen integrados:
 
-| Categoría | Proveedores (config) | Stub sin clave |
-|-----------|----------------------|----------------|
-| **Texto / LLM** (guión, metadata, storyboard, genesis) | `anthropic` (Claude), `openai` (GPT), `gemini` · `auto` elige el primero con clave | generación determinista |
-| **Voz / TTS** (lo más humano) | `elevenlabs` (v3, el más realista), `openai` (gpt-4o-mini-tts), `google` (Gemini TTS) | WAV silencioso dimensionado |
-| **Vídeo generativo** | `veo` (Veo 3.1, audio nativo), `sora` (Sora 2), `runway` (Gen-4) | clip de color / manifest |
-| **Render data-card** | `ffmpeg`, `remotion` (`FACTORY_REMOTION_ENTRY`) | manifest JSON |
-| **Datos (luz)** | `preciodelaluz` (sin token), `esios` (token gratis) | `fixture` incluido |
-| **Publicación** | YouTube direct-post (`FACTORY_YT_ACCESS_TOKEN`); TikTok/IG `auto` con app aprobada | cola *assisted* 1-toque |
-| **Estado** | `FACTORY_STORE=postgres` (+ `DATABASE_URL`) | JSON store en `out/_db` |
-| **Scheduling** | `factory worker` (BullMQ + `REDIS_URL`) | `factory run` puntual |
+| Categoría | Cloud (de pago) | **Local ($0, self-hosted)** | Stub sin nada |
+|-----------|-----------------|------------------------------|----------------|
+| **Texto / LLM** | `anthropic`, `openai`, `gemini` (`auto`) | **`local`/`ollama`** (Ollama/LM Studio/vLLM, OpenAI-compat) | generación determinista |
+| **Voz / TTS** | `elevenlabs` (v3), `openai`, `google` | **`kokoro`/`local`** (Kokoro/LocalAI), **`piper`** | WAV silencioso |
+| **Imagen** | `openai` (gpt-image-1) | **`comfyui`** (FLUX / SDXL) | PNG de color / manifest |
+| **Vídeo** | `veo` (3.1), `sora` (2), `runway` (Gen-4) | **`comfyui`** (Wan 2.2 / LTX-Video / HunyuanVideo) | clip de color / manifest |
+| **Datos (luz)** | `preciodelaluz`, `esios` | (local por naturaleza) | `fixture` incluido |
+| **Publicación** | YouTube direct-post; TikTok/IG `auto` | — | cola *assisted* 1-toque |
+| **Estado / cola** | — | Postgres (`FACTORY_STORE`), BullMQ (`factory worker`) | JSON store / run puntual |
 
-`factory providers` y `factory styles` listan lo disponible. Copia `.env.example` a `.env`
-para activar producción.
+`factory providers` y `factory styles` listan lo disponible. Copia `.env.example` a `.env`.
+
+### Modelos LOCALES — coste de IA: 0€
+
+Todo el stack puede correr **self-hosted**, sin pagar APIs. Los mejores open-source de cada
+categoría, integrados detrás de las mismas interfaces (caen a stub si el servidor no responde):
+
+- **Texto:** [Ollama](https://ollama.com) (Qwen3 / Llama 4) — endpoint OpenAI-compatible.
+- **Voz:** **Kokoro** (calidad casi-ElevenLabs, corre hasta en CPU) vía servidor OpenAI-compatible, o **Piper** (binario, rapidísimo).
+- **Imagen:** **FLUX** / **SDXL** vía **ComfyUI**.
+- **Vídeo:** **Wan 2.2** / **LTX-Video** / **HunyuanVideo** vía **ComfyUI**.
+
+Crea un canal totalmente local de un tiro:
+
+```bash
+npm run factory -- create --topic "curiosidades de la historia" --local
+```
+
+Esto configura texto=Ollama, voz=Kokoro y **modo `images`** (1 imagen IA por plano +
+Ken Burns, lo más barato y local-friendly). Ejemplo listo: `src/config/historia-local.yaml`.
+Las URLs locales se ajustan en `.env` (`FACTORY_LOCAL_LLM_URL`, `FACTORY_LOCAL_TTS_URL`,
+`FACTORY_COMFYUI_URL`). Workflows de ComfyUI editables en `comfyui-workflows/`.
 
 ### Vídeo generativo con IA + estilos
 
 Pon `render.engine: generative` y una sección `video` en la config:
 
+Modos de vídeo (`video.mode`): **`generative`** (un clip IA por plano: Veo/Sora/Runway o
+Wan/LTX/Hunyuan local) o **`images`** (una imagen IA por plano + Ken Burns — el más barato,
+ideal en local con FLUX/SDXL).
+
 ```yaml
 render: { engine: generative, aspect_ratios: ["9:16"] }
 video:
-  mode: generative
-  provider: veo            # veo | sora | runway | stub
+  mode: generative        # generative | images
+  provider: veo            # veo | sora | runway | comfyui (local) | stub
   style: cinematic         # realistic | cinematic | documentary | anime | manga |
                            # comic | cartoon3d | claymation | pixelart | watercolor
   clip_seconds: 8
@@ -224,8 +247,10 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
   `--video-provider`, `--style`).
 - **M6 — Feedback loop:** ✅ atribución de rendimiento (`deriveFeedback`) → recomendaciones
   de horario/formato/hook. `factory feedback <canal>` (+ `metrics:sample` para demo).
-- **Generación por IA (texto/voz/vídeo):** ✅ 3 proveedores top por categoría + sistema de
-  estilos + storyboard + prompts por proveedor.
+- **Generación por IA (texto/voz/imagen/vídeo):** ✅ 3 proveedores cloud top por categoría
+  + sistema de estilos + storyboard + prompts por proveedor.
+- **Modelos LOCALES ($0):** ✅ Ollama (texto), Kokoro/Piper (voz), ComfyUI FLUX/SDXL
+  (imagen) y Wan/LTX/Hunyuan (vídeo); modo `images` con Ken Burns; `create --local`.
 
 Las integraciones de pago van **sobre `fetch` detrás de interfaces** (sin SDKs): cambiar
 de proveedor es config, no código.

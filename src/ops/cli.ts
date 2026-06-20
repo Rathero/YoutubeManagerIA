@@ -62,9 +62,10 @@ program
   .option("-r, --region <region>", "region code", "ES")
   .option("-o, --out <dir>", "output directory for the config", "src/config")
   .option("-y, --yes", "non-interactive: accept all recommendations", false)
-  .action(async (opts: { topic?: string; language: string; region: string; out: string; yes?: boolean }) => {
+  .option("--local", "fully-local $0 stack: Ollama + Kokoro + ComfyUI", false)
+  .action(async (opts: { topic?: string; language: string; region: string; out: string; yes?: boolean; local?: boolean }) => {
     const { runWizard } = await import("../genesis/wizard.js");
-    await runWizard({ topic: opts.topic, language: opts.language, region: opts.region, outDir: opts.out, yes: opts.yes });
+    await runWizard({ topic: opts.topic, language: opts.language, region: opts.region, outDir: opts.out, yes: opts.yes, local: opts.local });
   });
 
 program
@@ -120,11 +121,19 @@ program
   .command("providers")
   .description("List available AI providers per category (text / voice / video)")
   .action(() => {
-    console.log("Text (LLM):   anthropic, openai, gemini  (auto = first with a key)");
-    console.log("Voice (TTS):  elevenlabs, openai, google, azure, piper, stub");
-    console.log("Video (gen):  veo, sora, runway, stub");
-    console.log("\nKeys read from env (.env): ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY,");
-    console.log("ELEVENLABS_API_KEY, RUNWAY_API_KEY, FACTORY_YT_ACCESS_TOKEN. Missing key → stub fallback.");
+    console.log("CLOUD (de pago):");
+    console.log("  Text (LLM):   anthropic, openai, gemini  (auto = first with a key)");
+    console.log("  Voice (TTS):  elevenlabs, openai, google");
+    console.log("  Image:        openai (gpt-image-1)");
+    console.log("  Video (gen):  veo, sora, runway");
+    console.log("\nLOCAL ($0, self-hosted):");
+    console.log("  Text (LLM):   local | ollama   → OpenAI-compatible (Ollama/LM Studio/vLLM)");
+    console.log("  Voice (TTS):  kokoro | local   → Kokoro/Speaches/LocalAI (OpenAI-compatible)");
+    console.log("                piper            → Piper binary");
+    console.log("  Image:        comfyui          → FLUX / SDXL");
+    console.log("  Video (gen):  comfyui          → Wan 2.2 / LTX-Video / HunyuanVideo");
+    console.log("\nLocal URLs (env): FACTORY_LOCAL_LLM_URL (11434), FACTORY_LOCAL_TTS_URL (8880),");
+    console.log("FACTORY_COMFYUI_URL (8188). Sin clave/servidor → fallback a stub. `create --local` lo configura.");
   });
 
 program

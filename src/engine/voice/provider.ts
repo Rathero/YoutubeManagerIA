@@ -1,4 +1,4 @@
-import { exec } from "node:child_process";
+import { exec, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -191,9 +191,63 @@ export class GoogleTtsProvider implements TtsProvider {
   }
 }
 
+// ── Local: Kokoro / Speaches / LocalAI (OpenAI-compatible, $0) ───────────────────
+
+export class LocalTtsProvider implements TtsProvider {
+  readonly name = "local";
+  private base = process.env.FACTORY_LOCAL_TTS_URL ?? "http://localhost:8880/v1";
+  constructor(private cfg: VoiceConfig) {}
+  available(): boolean {
+    return true; // reachability checked at call time; voice stage falls back on error
+  }
+  async synthesize(req: TtsRequest): Promise<TtsResult> {
+    const path = req.outPath.replace(/\.[^.]+$/, ".mp3");
+    const base = this.cfg.base ?? this.base;
+    const res = await fetch(`${base}/audio/speech`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer local" },
+      body: JSON.stringify({
+        model: this.cfg.model_id ?? "kokoro",
+        voice: this.cfg.voice_id ?? "af_sky",
+        input: req.text,
+        response_format: "mp3",
+        speed: this.cfg.speed,
+      }),
+    });
+    if (!res.ok) throw new Error(`Local TTS ${res.status}: ${await res.text()}`);
+    await writeBytes(path, await res.arrayBuffer());
+    return { path, durationSec: await probeDuration(path, req.text, this.cfg.speed), textHash: hashText(req.text) };
+  }
+}
+
+// ── Piper (local binary, fast, $0) ───────────────────────────────────────────────
+
+export class PiperTtsProvider implements TtsProvider {
+  readonly name = "piper";
+  private bin = process.env.PIPER_BIN ?? "piper";
+  constructor(private cfg: VoiceConfig) {}
+  available(): boolean {
+    return Boolean(this.cfg.model_path);
+  }
+  async synthesize(req: TtsRequest): Promise<TtsResult> {
+    const path = req.outPath.replace(/\.[^.]+$/, ".wav");
+    await mkdir(dirname(path), { recursive: true });
+    await new Promise<void>((resolveP, rejectP) => {
+      const child = spawn(this.bin, ["-m", this.cfg.model_path!, "-f", path], { stdio: ["pipe", "ignore", "pipe"] });
+      let err = "";
+      child.stderr.on("data", (d) => (err += d.toString()));
+      child.on("error", rejectP);
+      child.on("close", (code) => (code === 0 ? resolveP() : rejectP(new Error(`piper exited ${code}: ${err}`))));
+      child.stdin.write(req.text);
+      child.stdin.end();
+    });
+    return { path, durationSec: await probeDuration(path, req.text, this.cfg.speed), textHash: hashText(req.text) };
+  }
+}
+
 /**
- * Resolve the configured TTS provider, falling back to the stub when its credentials
- * are missing so the pipeline always runs.
+ * Resolve the configured TTS provider, falling back to the stub when it isn't available
+ * so the pipeline always runs. (The voice stage additionally falls back if synth throws.)
  */
 export function getTtsProvider(cfg: VoiceConfig): { provider: TtsProvider; fellBack: boolean } {
   let provider: TtsProvider;
@@ -207,9 +261,16 @@ export function getTtsProvider(cfg: VoiceConfig): { provider: TtsProvider; fellB
     case "google":
       provider = new GoogleTtsProvider(cfg);
       break;
+    case "local":
+    case "kokoro":
+      provider = new LocalTtsProvider(cfg);
+      break;
+    case "piper":
+      provider = new PiperTtsProvider(cfg);
+      break;
     default:
       provider = new StubTtsProvider(cfg.speed);
   }
   if (provider.available()) return { provider, fellBack: false };
-  return { provider: new StubTtsProvider(cfg.speed), fellBack: cfg.provider !== "stub" && cfg.provider !== "azure" && cfg.provider !== "piper" };
+  return { provider: new StubTtsProvider(cfg.speed), fellBack: cfg.provider !== "stub" && cfg.provider !== "azure" };
 }

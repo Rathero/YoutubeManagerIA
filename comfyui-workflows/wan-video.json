@@ -1,0 +1,11 @@
+{
+  "_README": "PLACEHOLDER. Replace with a real text→video workflow exported from ComfyUI (Save API Format). Models: Wan 2.2 / LTX-Video / HunyuanVideo. Keep the tokens {{PROMPT}} {{NEGATIVE}} {{WIDTH}} {{HEIGHT}} {{SECONDS}} {{FPS}} and make the final node output a video (e.g. VHS_VideoCombine). This stub will NOT run as-is.",
+  "_tokens": {
+    "prompt": "{{PROMPT}}",
+    "negative": "{{NEGATIVE}}",
+    "width": "{{WIDTH}}",
+    "height": "{{HEIGHT}}",
+    "seconds": "{{SECONDS}}",
+    "fps": "{{FPS}}"
+  }
+}

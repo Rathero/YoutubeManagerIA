@@ -224,6 +224,14 @@ program
   });
 
 program
+  .command("hardware")
+  .description("Detect your machine and recommend what you can run locally")
+  .action(async () => {
+    const { runHardware } = await import("../ops/hardware.js");
+    await runHardware();
+  });
+
+program
   .command("doctor")
   .description("Check which local servers (LLM/TTS/ComfyUI) and cloud keys are available")
   .action(async () => {

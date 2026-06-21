@@ -15,10 +15,17 @@ video: { mode: generative, provider: comfyui, workflow: "comfyui-workflows/wan-v
 The factory queues the workflow on your ComfyUI server (`FACTORY_COMFYUI_URL`, default
 `http://localhost:8188`), polls until done, and downloads the output. Inference cost: **0€**.
 
+## Descarga automática de modelos
+
+`npm run setup:comfyui` baja el mejor modelo de imagen según tu VRAM (FLUX.1 schnell o SDXL),
+lo deja en `comfyui-models/` (bind-montado en el contenedor) y te indica qué workflow usar.
+
 ## Provided templates
 
-- **`sdxl-image.json`** — Stable Diffusion XL text→image. Swap `ckpt_name` for your
-  installed checkpoint (e.g. a FLUX or SDXL model). The final node is `SaveImage`.
+- **`flux-schnell-image.json`** — FLUX.1 schnell (fp8, single-file). La mejor calidad open,
+  licencia Apache (uso comercial), 4 pasos. Checkpoint: `flux1-schnell-fp8.safetensors`.
+- **`sdxl-image.json`** — Stable Diffusion XL text→image. Checkpoint: `sd_xl_base_1.0.safetensors`.
+  Más ligero (8 GB VRAM).
 - **`wan-video.json`** — placeholder for a local **text→video** model (Wan 2.2 / LTX-Video /
   HunyuanVideo). **Replace it with your own**: build the graph in ComfyUI, then
   *Save (API Format)*, and add the tokens above where prompt/size/length go. The final

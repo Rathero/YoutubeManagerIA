@@ -19,6 +19,7 @@
     "ui": "tsx src/ops/cli.ts dashboard --open",
     "verify": "bash scripts/verify.sh",
     "doctor": "tsx src/ops/cli.ts doctor",
+    "hardware": "tsx src/ops/cli.ts hardware",
     "setup:local": "bash scripts/setup-local.sh",
     "setup:local:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-local.ps1",
     "setup:comfyui": "bash scripts/setup-comfyui.sh",

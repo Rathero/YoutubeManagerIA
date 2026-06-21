@@ -202,6 +202,10 @@ y listo. Notas:
 - **Programación 24/7 sin Docker:** además del worker, puedes disparar `npm run factory -- run <id>`
   desde el **Programador de tareas** de Windows.
 
+> **Desplegar online:** ver **`DEPLOY.md`** (copia-pega para Hetzner/Oracle + GPU a demanda en
+> Vast.ai/RunPod) · requisitos de máquina en **`HARDWARE.md`** · coste self-host vs API con
+> `factory estimate <canal> --infra`.
+
 ## Operación 24/7 (un solo comando)
 
 Stack completo en Docker — **worker (BullMQ) + Postgres + Redis**, con perfiles opcionales

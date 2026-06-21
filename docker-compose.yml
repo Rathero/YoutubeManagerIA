@@ -59,7 +59,29 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ── Local AI (optional) ─────────────────────────────────────────────────────────
+  dashboard:
+    build: .
+    container_name: cf-dashboard
+    command: ["dist/ops/cli.js", "dashboard", "--port", "8787"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      FACTORY_STORE: postgres
+      DATABASE_URL: postgres://factory:factory@postgres:5432/factory
+      FACTORY_LOCAL_LLM_URL: ${FACTORY_LOCAL_LLM_URL:-http://ollama:11434/v1}
+      FACTORY_LOCAL_TTS_URL: ${FACTORY_LOCAL_TTS_URL:-http://kokoro:8880/v1}
+      FACTORY_COMFYUI_URL: ${FACTORY_COMFYUI_URL:-http://comfyui:8188}
+      # Recomendado en una VM pública: protege la UI con un token.
+      FACTORY_DASHBOARD_TOKEN: ${FACTORY_DASHBOARD_TOKEN:-}
+    ports:
+      - "8787:8787"
+    volumes:
+      - out:/app/out
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
   ollama:
     image: ollama/ollama:latest
     container_name: cf-ollama

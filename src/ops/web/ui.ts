@@ -88,7 +88,12 @@ label{display:block;font-weight:700;margin:14px 0 6px;font-size:13px}
 <script>
 const $=(s,e=document)=>e.querySelector(s);
 const app=$('#app');
-const api=async(u,opt)=>{const r=await fetch(u,opt);if(!r.ok)throw new Error((await r.text())||r.status);return r.json()};
+// Token (for protected/public dashboards): open with ?token=XYZ once; it's remembered.
+const TOKEN=new URLSearchParams(location.search).get('token')||localStorage.getItem('cf_token')||'';
+if(TOKEN)localStorage.setItem('cf_token',TOKEN);
+const api=async(u,opt={})=>{
+ opt.headers=Object.assign({},opt.headers,TOKEN?{'x-factory-token':TOKEN}:{});
+ const r=await fetch(u,opt);if(!r.ok)throw new Error((await r.text())||r.status);return r.json()};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pill=s=>{const c=s==='active'?'ok':s==='draft'?'warn':'';return '<span class="chip '+c+'"><span class="dot"></span>'+esc(s)+'</span>'};
 const money=n=>n===0?'<span class="chip ok">$0 · local</span>':'$'+n+'<span class="muted">/mes</span>';

@@ -143,12 +143,14 @@ program
 
 program
   .command("estimate")
-  .description("Estimate monthly AI cost for a channel by provider")
+  .description("Estimate monthly AI cost for a channel; --infra compares API vs self-host")
   .argument("<channel>", "channel id or path")
-  .action(async (channel: string) => {
+  .option("--infra", "also compare cloud APIs vs self-hosted GPU options", false)
+  .action(async (channel: string, opts: { infra?: boolean }) => {
     const def = await loadChannelDefinition(resolveConfig(channel));
-    const { estimateChannel, formatEstimate } = await import("../ops/estimate.js");
+    const { estimateChannel, formatEstimate, estimateInfra, formatInfra } = await import("../ops/estimate.js");
     console.log(formatEstimate(def, estimateChannel(def)));
+    if (opts.infra) console.log(formatInfra(def, estimateInfra(def)));
   });
 
 program

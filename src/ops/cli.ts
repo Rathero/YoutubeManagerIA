@@ -118,6 +118,36 @@ program
   });
 
 program
+  .command("schedule")
+  .description("Preview the next scheduled runs for every active channel")
+  .option("-n, --count <n>", "occurrences per channel", "5")
+  .action(async (opts: { count: string }) => {
+    const { configDir } = await import("../storage/paths.js");
+    const { readdir } = await import("node:fs/promises");
+    const { nextRuns } = await import("./schedule.js");
+    const dir = configDir();
+    const files = (await readdir(dir).catch(() => [])).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"));
+    const count = Math.max(1, Number.parseInt(opts.count, 10) || 5);
+    const now = new Date();
+    let shown = 0;
+    for (const f of files) {
+      try {
+        const def = await loadChannelDefinition(resolve(dir, f));
+        if (def.status !== "active") continue;
+        const at = def.schedule.trigger.at;
+        const runs = nextRuns(at, now, count);
+        console.log(`\n${def.id} (${at ?? "sin trigger"}, tz ${def.schedule.timezone}):`);
+        if (runs.length === 0) console.log("  — sin próximas ejecuciones (trigger no reconocido)");
+        else for (const r of runs) console.log(`  ${r}`);
+        shown++;
+      } catch {
+        /* skip invalid configs */
+      }
+    }
+    if (shown === 0) console.log("No hay canales activos.");
+  });
+
+program
   .command("runs")
   .description("List recent runs for a channel (status, stages, publications)")
   .argument("<channel>", "channel id")
@@ -268,27 +298,43 @@ program
 
 program
   .command("run-all")
-  .description("Run one cycle for every active channel (bulk)")
+  .description("Run one cycle for every active channel (bulk, in parallel)")
   .option("-d, --date <iso>", "target date (YYYY-MM-DD)")
   .option("--dry-run", "do everything except publishing", false)
-  .action(async (opts: { date?: string; dryRun?: boolean }) => {
+  .option("-c, --concurrency <n>", "channels to process in parallel", "2")
+  .action(async (opts: { date?: string; dryRun?: boolean; concurrency?: string }) => {
     const { configDir } = await import("../storage/paths.js");
     const { readdir } = await import("node:fs/promises");
+    const { mapLimit } = await import("../core/util/concurrency.js");
     const dir = configDir();
     const files = (await readdir(dir).catch(() => [])).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"));
-    let ran = 0;
+    const limit = Math.max(1, Number.parseInt(opts.concurrency ?? "2", 10) || 2);
+
+    // Load + filter to active channels first, then process them with bounded concurrency.
+    const active: { id: string; def: Awaited<ReturnType<typeof loadChannelDefinition>> }[] = [];
     for (const f of files) {
       try {
         const def = await loadChannelDefinition(resolve(dir, f));
-        if (def.status !== "active") continue;
-        const o = await runChannel(def, { date: opts.date, dryRun: opts.dryRun });
-        console.log(`  ${def.id}: ${o.status}`);
-        ran++;
+        if (def.status === "active") active.push({ id: def.id, def });
       } catch (e) {
         console.log(`  ${f}: error ${(e as Error).message}`);
       }
     }
-    console.log(`\n${ran} canal(es) activos ejecutados.`);
+    console.log(`Ejecutando ${active.length} canal(es) activos (concurrencia ${limit})…`);
+    const started = Date.now();
+    const results = await mapLimit(active, limit, async ({ id, def }) => {
+      try {
+        const o = await runChannel(def, { date: opts.date, dryRun: opts.dryRun });
+        console.log(`  ${id}: ${o.status}`);
+        return o.status === "failed" ? "failed" : "ok";
+      } catch (e) {
+        console.log(`  ${id}: error ${(e as Error).message}`);
+        return "failed";
+      }
+    });
+    const ok = results.filter((r) => r === "ok").length;
+    const failed = results.length - ok;
+    console.log(`\n${ok} ok, ${failed} con error · ${((Date.now() - started) / 1000).toFixed(1)}s`);
   });
 
 program

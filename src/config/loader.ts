@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ChannelDefinitionSchema, type ChannelDefinition } from "../core/types/index.js";
+import { configDir } from "../storage/paths.js";
 
 /** Parse + validate a ChannelDefinition from a YAML/JSON file. */
 export async function loadChannelDefinition(path: string): Promise<ChannelDefinition> {
@@ -11,6 +12,7 @@ export async function loadChannelDefinition(path: string): Promise<ChannelDefini
   return ChannelDefinitionSchema.parse(raw);
 }
 
+/** Resolve a channel id to its config file (tenant config dir, else src/config). */
 export function defaultConfigPath(channelId: string): string {
-  return resolve(process.cwd(), "src/config", `${channelId}.yaml`);
+  return resolve(configDir(), `${channelId}.yaml`);
 }

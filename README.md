@@ -310,7 +310,16 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
   elige el enlace más relevante del día y lo inserta con UTM en descripciones y newsletter.
 - **Alertas:** Discord (`DISCORD_WEBHOOK_URL`) y/o Telegram en cada fallo (y éxito si
   `FACTORY_ALERT_ON_SUCCESS=1`).
-- **Dashboard web:** `factory dashboard [--port 8787]` — canales, ejecuciones y coste, sin deps.
+- **Dashboard web (UI SaaS):** `factory dashboard [--port 8787]` — interfaz moderna sin
+  dependencias: **inicio** con KPIs y estado local, **asistente de creación** guiado (describe
+  → propuesta de modelo/estilo → crear, sin código), **gestión de canales** (estado, coste,
+  *run* de prueba) y **experimentos** sugeridos. Pensada para usuarios no técnicos.
+- **Auto-experimentos:** `factory experiments <canal>` propone/sigue tests (título, hora,
+  formato, duración) y concluye con el ganador cuando hay datos.
+- **Multi-tenant (SaaS):** `FACTORY_TENANT=<org>` aísla datos (`out/_tenants/<org>`) y configs
+  (`tenants/<org>/config`); el dashboard admite token (`FACTORY_DASHBOARD_TOKEN`).
+- **Copyright/Content-ID:** el QA **bloquea** publicar con música sin licencia declarada
+  (`render.music.library`); avisa de B-roll de stock (royalty-free) y etiqueta la IA como propia.
 
 ---
 

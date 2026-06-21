@@ -190,6 +190,27 @@ program
   });
 
 program
+  .command("experiments")
+  .description("Propose/track A-B experiments (title, time, format, duration) from metrics")
+  .argument("<channel>", "channel id")
+  .option("-m, --metrics <file>", "metrics JSON (defaults to out/_db/metrics/<id>.json)")
+  .action(async (channel: string, opts: { metrics?: string }) => {
+    const def = await loadChannelDefinition(resolveConfig(channel));
+    const path = opts.metrics ? resolve(process.cwd(), opts.metrics) : join(dbDir(), "metrics", `${channel}.json`);
+    let metrics: any[] = [];
+    try { metrics = JSON.parse(await readFile(path, "utf8")); } catch { /* none yet */ }
+    const { proposeExperiments } = await import("../analytics/experiments.js");
+    const exps = proposeExperiments(def, metrics);
+    console.log(`\nExperimentos para ${channel} (${metrics.length} datos):`);
+    for (const e of exps) {
+      const icon = e.status === "concluded" ? "🏁" : e.status === "running" ? "🔬" : "💡";
+      console.log(`  ${icon} [${e.variable}] ${e.status}`);
+      console.log(`     ${e.note}`);
+    }
+    console.log("");
+  });
+
+program
   .command("dashboard")
   .description("Serve a small web dashboard (channels, runs, cost)")
   .option("-p, --port <port>", "port", "8787")

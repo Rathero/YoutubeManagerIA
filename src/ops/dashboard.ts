@@ -1,52 +1,38 @@
-import { createServer } from "node:http";
-import { readdir } from "node:fs/promises";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { stringify as toYaml } from "yaml";
 import { loadChannelDefinition } from "../config/loader.js";
+import { configDir, dbDir, tenant } from "../storage/paths.js";
 import { getStore } from "../storage/index.js";
 import { estimateChannel } from "./estimate.js";
+import { recommendStrategy } from "../genesis/recommend.js";
+import { buildDefinitionFromRecommendation } from "../genesis/wizard.js";
+import { runChannel } from "../engine/run.js";
+import { proposeExperiments } from "../analytics/experiments.js";
+import { BUILT_IN_STYLES } from "../engine/visuals/style.js";
+import { probeLocalServices } from "./doctor.js";
+import { UI_HTML } from "./web/ui.js";
 
-const PAGE = `<!doctype html><html lang="es"><head><meta charset="utf-8"/>
-<title>Channel Factory</title><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<style>
- body{font:14px/1.5 system-ui,sans-serif;margin:0;background:#0b1220;color:#e5e7eb}
- header{padding:16px 24px;background:#111827;border-bottom:1px solid #1f2937}
- h1{margin:0;font-size:18px}main{padding:24px;max-width:1000px;margin:0 auto}
- table{width:100%;border-collapse:collapse;margin:8px 0 24px}
- th,td{text-align:left;padding:6px 10px;border-bottom:1px solid #1f2937}
- th{color:#9ca3af;font-weight:600}.ok{color:#34d399}.fail{color:#f87171}.skip{color:#fbbf24}
- .pill{background:#1f2937;border-radius:6px;padding:1px 8px;font-size:12px}
- a{color:#60a5fa}select{background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:6px;padding:4px}
-</style></head><body>
-<header><h1>🏭 Channel Factory — panel</h1></header>
-<main>
- <h2>Canales</h2><table id="channels"><thead><tr><th>id</th><th>status</th><th>adapter</th><th>vídeo</th><th>coste/mes</th></tr></thead><tbody></tbody></table>
- <h2>Ejecuciones <select id="ch"></select></h2>
- <table id="runs"><thead><tr><th>fecha</th><th>estado</th><th>salidas</th><th>etapa fallida</th><th>run</th></tr></thead><tbody></tbody></table>
-</main>
-<script>
-async function j(u){const r=await fetch(u);return r.json()}
-function cls(s){return s==='completed'?'ok':s==='failed'?'fail':'skip'}
-async function load(){
- const chs=await j('/api/channels');
- document.querySelector('#channels tbody').innerHTML=chs.map(c=>
-   '<tr><td>'+c.id+'</td><td><span class=pill>'+c.status+'</span></td><td>'+c.adapter+'</td><td>'+c.video+'</td><td>'+(c.cost===0?'<span class=ok>$0 (local)</span>':'$'+c.cost)+'</td></tr>').join('');
- const sel=document.getElementById('ch');
- sel.innerHTML=chs.map(c=>'<option>'+c.id+'</option>').join('');
- sel.onchange=()=>runs(sel.value);
- if(chs[0])runs(chs[0].id);
+function send(res: ServerResponse, status: number, obj: unknown): void {
+  res.statusCode = status;
+  res.setHeader("content-type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(obj));
 }
-async function runs(id){
- const rs=await j('/api/runs?channel='+encodeURIComponent(id));
- document.querySelector('#runs tbody').innerHTML=rs.map(r=>{
-  const f=(r.stages||[]).find(s=>s.status==='failed');
-  return '<tr><td>'+r.date+'</td><td class='+cls(r.status)+'>'+r.status+'</td><td>'+(r.publications||[]).length+'</td><td>'+(f?f.stage:'')+'</td><td>'+r.runId.slice(0,8)+'</td></tr>';
- }).join('')||'<tr><td colspan=5>sin ejecuciones</td></tr>';
-}
-load();
-</script></body></html>`;
 
-async function listChannels(): Promise<Array<{ id: string; status: string; adapter: string; video: string; cost: number }>> {
-  const dir = resolve(process.cwd(), "src/config");
+async function readBody(req: IncomingMessage): Promise<any> {
+  const chunks: Buffer[] = [];
+  for await (const c of req) chunks.push(c as Buffer);
+  if (chunks.length === 0) return {};
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    return {};
+  }
+}
+
+async function listChannels() {
+  const dir = configDir();
   let files: string[] = [];
   try {
     files = (await readdir(dir)).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"));
@@ -57,41 +43,110 @@ async function listChannels(): Promise<Array<{ id: string; status: string; adapt
   for (const f of files) {
     try {
       const def = await loadChannelDefinition(resolve(dir, f));
-      out.push({
-        id: def.id,
-        status: def.status,
-        adapter: def.data.adapter,
-        video: def.video?.mode ?? def.render.engine,
-        cost: estimateChannel(def).perMonthUsd,
-      });
+      out.push({ id: def.id, status: def.status, adapter: def.data.adapter, video: def.video?.mode ?? def.render.engine, cost: estimateChannel(def).perMonthUsd });
     } catch {
-      /* skip invalid config */
+      /* skip invalid */
     }
   }
   return out;
 }
 
+async function channelDetail(id: string) {
+  const def = await loadChannelDefinition(resolve(configDir(), `${id}.yaml`));
+  const store = await getStore();
+  const runs = await store.listRuns(id, 30);
+  return {
+    name: def.identity.name,
+    topic: def.niche.topic,
+    status: def.status,
+    adapter: def.data.adapter,
+    video: def.video?.mode ?? def.render.engine,
+    style: def.video?.style,
+    cost: estimateChannel(def).perMonthUsd,
+    runs,
+  };
+}
+
+async function loadMetrics(id: string): Promise<any[]> {
+  try {
+    return JSON.parse(await readFile(resolve(dbDir(), "metrics", `${id}.json`), "utf8"));
+  } catch {
+    return [];
+  }
+}
+
 export function startDashboard(port = 8787): ReturnType<typeof createServer> {
+  const token = process.env.FACTORY_DASHBOARD_TOKEN;
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
-      if (url.pathname === "/api/channels") {
-        res.setHeader("content-type", "application/json");
-        res.end(JSON.stringify(await listChannels()));
-        return;
+      const path = url.pathname;
+
+      // Optional token gate for the API.
+      if (token && path.startsWith("/api/") && path !== "/api/health" && req.headers["x-factory-token"] !== token) {
+        return send(res, 401, { error: "unauthorized" });
       }
-      if (url.pathname === "/api/runs") {
-        const channel = url.searchParams.get("channel") ?? "";
+
+      if (path === "/" || path === "/index.html") {
+        res.setHeader("content-type", "text/html; charset=utf-8");
+        return res.end(UI_HTML);
+      }
+      if (path === "/api/health") return send(res, 200, { ok: true, tenant: tenant() || "default" });
+      if (path === "/api/doctor") {
+        const r = await probeLocalServices();
+        return send(res, 200, { llm: r.llm.ok, llmModel: r.llmModel, tts: r.tts.ok, comfyui: r.comfyui.ok, ffmpeg: r.ffmpeg.ok });
+      }
+      if (path === "/api/channels" && req.method === "GET") return send(res, 200, await listChannels());
+
+      if (path === "/api/recommend") {
+        const topic = url.searchParams.get("topic") ?? "";
+        const local = url.searchParams.get("local") === "true";
+        const rec = await recommendStrategy(topic, { language: "es-ES" });
+        if (local) { rec.voiceProvider = "kokoro" as any; rec.videoProvider = "comfyui" as any; }
+        return send(res, 200, { ...rec, styleOptions: [...Object.keys(BUILT_IN_STYLES), "data_card"] });
+      }
+
+      if (path === "/api/channels" && req.method === "POST") {
+        const b = await readBody(req);
+        if (!b.topic) return send(res, 400, { error: "topic required" });
+        const rec = await recommendStrategy(b.topic, { language: b.language });
+        if (b.style) { rec.style = b.style; rec.videoMode = b.style === "data_card" || rec.contentKind === "data" ? "data_card" : "generative"; }
+        if (b.voiceProvider) rec.voiceProvider = b.voiceProvider;
+        if (b.videoProvider) rec.videoProvider = b.videoProvider;
+        const def = buildDefinitionFromRecommendation(b.topic, rec, { language: b.language, region: b.region, local: b.local });
+        const dir = configDir();
+        await mkdir(dir, { recursive: true });
+        await writeFile(resolve(dir, `${def.id}.yaml`), toYaml(def));
+        return send(res, 200, { id: def.id });
+      }
+
+      const detailMatch = path.match(/^\/api\/channels\/([^/]+)$/);
+      if (detailMatch) return send(res, 200, await channelDetail(decodeURIComponent(detailMatch[1]!)));
+
+      const expMatch = path.match(/^\/api\/channels\/([^/]+)\/experiments$/);
+      if (expMatch) {
+        const id = decodeURIComponent(expMatch[1]!);
+        const def = await loadChannelDefinition(resolve(configDir(), `${id}.yaml`));
+        return send(res, 200, proposeExperiments(def, await loadMetrics(id)));
+      }
+
+      const runMatch = path.match(/^\/api\/channels\/([^/]+)\/run$/);
+      if (runMatch && req.method === "POST") {
+        const id = decodeURIComponent(runMatch[1]!);
+        const def = await loadChannelDefinition(resolve(configDir(), `${id}.yaml`));
+        const outcome = await runChannel(def, { dryRun: true });
+        const detail = outcome.status === "failed" ? `${outcome.stage}: ${outcome.error.message}` : `${(outcome.ctx.publications ?? []).length} salidas`;
+        return send(res, 200, { status: outcome.status, detail });
+      }
+
+      if (path === "/api/runs") {
         const store = await getStore();
-        res.setHeader("content-type", "application/json");
-        res.end(JSON.stringify(await store.listRuns(channel, 50)));
-        return;
+        return send(res, 200, await store.listRuns(url.searchParams.get("channel") ?? "", 50));
       }
-      res.setHeader("content-type", "text/html; charset=utf-8");
-      res.end(PAGE);
+
+      send(res, 404, { error: "not found" });
     } catch (err) {
-      res.statusCode = 500;
-      res.end(String((err as Error).message));
+      send(res, 500, { error: (err as Error).message });
     }
   });
   server.listen(port);

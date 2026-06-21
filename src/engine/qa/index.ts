@@ -85,9 +85,18 @@ export function createQaStage(): Stage {
         );
       }
 
-      if (ctx.channel.render.music.enabled) {
-        // Licensing is config-asserted in the MVP; flag for the operator to confirm.
-        warnings.push("music enabled — ensure the track is from a licensed library");
+      // Copyright / Content-ID guardrail. Music must declare a license source; stock
+      // B-roll (Pexels/Pixabay) is royalty-free; AI-generated media is owned + disclosed.
+      const music = ctx.channel.render.music;
+      if (music.enabled) {
+        if (!music.library && !music.track) {
+          failures.push("music enabled but no licensed library/track declared (copyright risk) — set render.music.library");
+        } else if (!music.library) {
+          warnings.push("music: track set but no library declared — confirm you hold the license");
+        }
+      }
+      if (ctx.channel.render.broll.enabled && ctx.channel.render.broll.provider !== "none") {
+        warnings.push(`B-roll from ${ctx.channel.render.broll.provider} (royalty-free) — keep attribution where required`);
       }
 
       const passed = failures.length === 0;

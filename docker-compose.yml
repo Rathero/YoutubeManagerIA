@@ -86,6 +86,7 @@ services:
       - "8188:8188"
     volumes:
       - comfyui:/root
+      - ./comfyui-models:/root/ComfyUI/models
     restart: unless-stopped
     deploy:
       resources:

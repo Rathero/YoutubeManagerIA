@@ -55,8 +55,11 @@ make quickstart    # equivalente con make (Unix)
 ### 🆓 Para IA **local gratis** ($0) — opcional
 - [ ] Instalar **Docker Desktop** → https://www.docker.com/products/docker-desktop/
 - [ ] Ejecutar `npm run setup:local` (o `setup:local:win`) → levanta Ollama + Kokoro y descarga el modelo
-- [ ] (Opcional, GPU) **ComfyUI** para imagen/vídeo → `docker compose -f docker-compose.local.yml --profile gpu up -d`
-- [ ] Comprobar con `npm run doctor` (te dice si falta el modelo: `ollama pull <modelo>`)
+- [ ] (Opcional, GPU) **ComfyUI** para imagen/vídeo → `npm run setup:comfyui`
+  - Descarga **SDXL** (~6.9 GB) en `comfyui-models/` (en el host, reanudable) y deja el workflow
+    `comfyui-workflows/sdxl-image.json` listo. ComfyUI lo lee por bind-mount.
+  - Vídeo local (Wan/LTX/Hunyuan) sigue siendo manual: exporta tu workflow desde ComfyUI.
+- [ ] Comprobar con `npm run doctor` (te dice si falta el modelo de Ollama: `ollama pull <modelo>`)
 
 ### ☁️ Para IA **cloud** (mejor calidad) — opcional
 Pega las claves que quieras en `.env` (todas opcionales; sin ellas cae a stub/local):

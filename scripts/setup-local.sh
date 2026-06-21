@@ -69,8 +69,12 @@ fi
 
 # ── 4. ComfyUI (opcional, imagen/vídeo) ──────────────────────────────────────────
 say "4/4  ComfyUI (imagen/vídeo) — opcional, requiere GPU"
-info "Levanta cuando quieras:  docker compose -f $COMPOSE --profile gpu up -d comfyui"
-info "Workflows editables en comfyui-workflows/ (FLUX/SDXL, Wan/LTX/Hunyuan)."
+if [ "${COMFYUI:-0}" = "1" ]; then
+  bash scripts/setup-comfyui.sh
+else
+  info "Descarga el modelo de imagen (SDXL) y deja el workflow listo con:  npm run setup:comfyui"
+  info "(o COMFYUI=1 npm run setup:local).  Workflows en comfyui-workflows/."
+fi
 
 say "Diagnóstico"
 npm run -s doctor || true

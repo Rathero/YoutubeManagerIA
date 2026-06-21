@@ -44,6 +44,9 @@ services:
       - "8188:8188"
     volumes:
       - comfyui:/root
+      # Host models (downloaded by `npm run setup:comfyui`). Adjust the in-container
+      # path if your ComfyUI image differs from yanwk/comfyui-boot.
+      - ./comfyui-models:/root/ComfyUI/models
     restart: unless-stopped
     deploy:
       resources:

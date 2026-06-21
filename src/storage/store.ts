@@ -22,6 +22,8 @@ export interface RunRecord {
   stages: StageRecord[];
   publications: PublishResult[];
   createdAt: string;
+  /** Version metadata — distinguishes regenerations of the same date. */
+  meta?: { headline?: string; style?: string; voice?: string };
 }
 
 export interface Store {
@@ -130,5 +132,10 @@ export function toRunRecord(
     stages: ctx.stageRecords,
     publications: ctx.publications ?? [],
     createdAt: new Date().toISOString(),
+    meta: {
+      headline: ctx.payload?.headlineFact,
+      style: ctx.channel.video?.style,
+      voice: ctx.channel.voice.provider,
+    },
   };
 }

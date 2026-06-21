@@ -324,6 +324,10 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 - **Regeneración con variantes:** `factory regenerate <canal> <fecha> --style X --voice Y --reroll`
   rehace una pieza con otro estilo/voz/ángulo (queda como nueva versión en el historial).
 - **Dedup difuso:** además del exacto, el QA detecta titulares **muy similares** (Jaccard).
+- **Editor de canal en la UI:** edita estado, proveedores, estilo, aprobación y hora de
+  publicación desde la web (valida con el schema y guarda la config). `/api/channels/:id/config`.
+- **Versiones:** cada run guarda su titular/estilo/voz; la ficha del canal lista las versiones
+  y permite **Regenerar (otro ángulo)** en un clic. Guion del último ciclo visible en la UI.
 
 ## Crecimiento, ingresos y operación
 

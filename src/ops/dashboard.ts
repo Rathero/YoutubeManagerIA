@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { stringify as toYaml } from "yaml";
 import { loadChannelDefinition } from "../config/loader.js";
 import { configDir, dbDir, tenant } from "../storage/paths.js";
@@ -144,6 +144,49 @@ export function startDashboard(port = 8787): ReturnType<typeof createServer> {
         await mkdir(dir, { recursive: true });
         await writeFile(resolve(dir, `${def.id}.yaml`), toYaml(def));
         return send(res, 200, { id: def.id });
+      }
+
+      const configMatch = path.match(/^\/api\/channels\/([^/]+)\/config$/);
+      if (configMatch) {
+        const id = decodeURIComponent(configMatch[1]!);
+        if (req.method === "GET") {
+          return send(res, 200, await loadChannelDefinition(resolve(configDir(), `${id}.yaml`)));
+        }
+        if (req.method === "PUT") {
+          const { saveChannelDefinition } = await import("../config/loader.js");
+          try {
+            const def = await saveChannelDefinition(await readBody(req));
+            return send(res, 200, { ok: true, id: def.id });
+          } catch (e) {
+            return send(res, 400, { error: (e as Error).message });
+          }
+        }
+      }
+
+      const lastMatch = path.match(/^\/api\/channels\/([^/]+)\/last$/);
+      if (lastMatch) {
+        const id = decodeURIComponent(lastMatch[1]!);
+        const { readdir, readFile } = await import("node:fs/promises");
+        const pdir = join(dbDir(), "payloads");
+        let files: string[] = [];
+        try { files = (await readdir(pdir)).filter((f) => f.startsWith(`${id}_`)).sort().reverse(); } catch { /* none */ }
+        if (files.length === 0) return send(res, 200, { payload: null, scripts: [] });
+        const date = files[0]!.slice(id.length + 1, -5);
+        const payload = JSON.parse(await readFile(join(pdir, files[0]!), "utf8"));
+        let scripts: unknown = [];
+        try { scripts = JSON.parse(await readFile(join(dbDir(), "scripts", `${id}_${date}.json`), "utf8")); } catch { /* none */ }
+        return send(res, 200, { date, payload, scripts });
+      }
+
+      const regenMatch = path.match(/^\/api\/channels\/([^/]+)\/regenerate$/);
+      if (regenMatch && req.method === "POST") {
+        const id = decodeURIComponent(regenMatch[1]!);
+        const b = await readBody(req);
+        const def = JSON.parse(JSON.stringify(await loadChannelDefinition(resolve(configDir(), `${id}.yaml`))));
+        if (b.style && def.video) def.video.style = b.style;
+        if (b.reroll) def.data.config = { ...(def.data.config ?? {}), rerollSeed: Math.floor(Math.random() * 1000) + 1 };
+        const outcome = await runChannel(def, { date: b.date, dryRun: true });
+        return send(res, 200, { status: outcome.status, headline: outcome.status === "completed" ? outcome.ctx.payload?.headlineFact : undefined });
       }
 
       const detailMatch = path.match(/^\/api\/channels\/([^/]+)$/);

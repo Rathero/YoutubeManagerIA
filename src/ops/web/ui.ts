@@ -176,11 +176,33 @@ async function viewChannel(id){
  const cls=s=>s==='completed'?'ok':s==='failed'?'bad':'warn';
  let exp='';try{const ex=await api('/api/channels/'+encodeURIComponent(id)+'/experiments');exp=ex.map(e=>'<div class="reco"><div class="item" style="grid-column:1/3"><div class="l">'+esc(e.variable)+' · '+esc(e.status)+'</div><div class="v" style="font-size:13px;font-weight:600">'+esc(e.note)+'</div></div></div>').join('')}catch{}
  let pend=[];try{pend=await api('/api/channels/'+encodeURIComponent(id)+'/pending')}catch{}
+ let cfg=null;try{cfg=await api('/api/channels/'+encodeURIComponent(id)+'/config')}catch{}
+ let last=null;try{last=await api('/api/channels/'+encodeURIComponent(id)+'/last')}catch{}
  const pendHtml=pend.length?'<div class="card" style="margin-bottom:18px;border-color:#7c6cff55"><h3>⏳ Pendiente de aprobación</h3>'+pend.map(p=>'<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px"><span>'+esc(p.date)+' · '+p.items.length+' salida(s)</span><span><button class="btn primary" data-ap="'+esc(p.date)+'">Aprobar y publicar</button> <button class="btn ghost" data-rj="'+esc(p.date)+'">Descartar</button></span></div>').join('')+'</div>':'';
+ const opt=(v,sel)=>'<option '+(v===sel?'selected':'')+'>'+v+'</option>';
+ const styleOpts=['realistic','cinematic','documentary','anime','manga','comic','cartoon3d','claymation','pixelart','watercolor','data_card'];
+ const editor=cfg?\`<div class="card" id="editor" style="display:none;margin-bottom:18px">
+   <h3>Editar canal</h3>
+   <div class="reco" style="margin-top:8px">
+    <div class="item"><div class="l">Estado</div><select id="e_status">\${['draft','active','paused','archived'].map(v=>opt(v,cfg.status)).join('')}</select></div>
+    <div class="item"><div class="l">Proveedor de texto</div><select id="e_text">\${['auto','anthropic','openai','gemini','local'].map(v=>opt(v,cfg.script.provider.name)).join('')}</select></div>
+    <div class="item"><div class="l">Voz</div><select id="e_voice">\${['stub','elevenlabs','openai','google','kokoro','piper'].map(v=>opt(v,cfg.voice.provider)).join('')}</select></div>
+    \${cfg.video?'<div class="item"><div class="l">Estilo</div><select id="e_style">'+styleOpts.map(v=>opt(v,cfg.video.style)).join('')+'</select></div>':''}
+    <div class="item"><div class="l">Aprobación humana</div><label class="toggle"><input type="checkbox" id="e_appr" \${cfg.approval&&cfg.approval.required?'checked':''}/> <span>requerida</span></label></div>
+    <div class="item"><div class="l">Hora publicación (cron)</div><input id="e_at" value="\${esc((cfg.schedule&&cfg.schedule.trigger&&cfg.schedule.trigger.at)||'')}"/></div>
+   </div>
+   <div style="margin-top:14px"><button class="btn primary" id="savecfg">Guardar</button> <button class="btn ghost" id="canceledit">Cancelar</button></div>
+  </div>\`:'';
+ const scriptCard=last&&last.payload?\`<div class="card" style="margin-bottom:18px">
+   <h3>Guion del último ciclo (\${esc(last.date||'')})</h3>
+   <p style="font-weight:700">\${esc(last.payload.headlineFact||'')}</p>
+   \${(last.scripts||[]).map(s=>'<div class="item" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:8px"><div class="l">'+esc(s.format)+' · '+s.wordCount+' palabras</div><div style="margin-top:4px;white-space:pre-wrap">'+esc((s.narration||'').slice(0,600))+'</div></div>').join('')||'<p class="muted">Sin guion guardado todavía.</p>'}
+  </div>\`:'';
  app.innerHTML=\`
   <a class="muted" href="#/channels">← Canales</a>
   <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
-   <div class="h1" style="margin:0">\${esc(d.name||id)}</div>\${pill(d.status)}
+   <div class="h1" style="margin:0">\${esc(d.name||id)}</div>
+   <span>\${pill(d.status)} <button class="btn ghost" id="editbtn">⚙ Editar</button></span>
   </div>
   <p class="sub">\${esc(d.topic||'')}</p>
   <div class="grid cards" style="margin-bottom:20px">
@@ -188,17 +210,30 @@ async function viewChannel(id){
    <div class="card kpi"><span class="l">Adapter</span><span class="n" style="font-size:22px">\${esc(d.adapter)}</span></div>
    <div class="card kpi"><span class="l">Vídeo</span><span class="n" style="font-size:22px">\${esc(d.video)} · \${esc(d.style||'-')}</span></div>
   </div>
-  \${pendHtml}
+  \${editor}\${pendHtml}\${scriptCard}
   <div class="card" style="margin-bottom:18px">
    <div class="row" style="justify-content:space-between;align-items:center">
-    <h3 style="margin:0">Ejecuciones</h3>
-    <button class="btn" id="runbtn">▶ Probar (dry-run)</button>
+    <h3 style="margin:0">Versiones / ejecuciones</h3>
+    <span><button class="btn ghost" id="regenbtn">🎲 Regenerar (otro ángulo)</button> <button class="btn" id="runbtn">▶ Probar (dry-run)</button></span>
    </div>
-   <table style="margin-top:10px"><thead><tr><th>Fecha</th><th>Estado</th><th>Salidas</th><th>Run</th></tr></thead><tbody>
-    \${runs.length?runs.map(r=>'<tr><td>'+esc(r.date)+'</td><td><span class="chip '+cls(r.status)+'"><span class=dot></span>'+esc(r.status)+'</span></td><td>'+(r.publications||[]).length+'</td><td class=muted>'+esc(r.runId.slice(0,8))+'</td></tr>').join(''):'<tr><td colspan=4 class=muted>Sin ejecuciones aún</td></tr>'}
+   <table style="margin-top:10px"><thead><tr><th>Fecha</th><th>Estado</th><th>Titular / estilo</th><th>Salidas</th></tr></thead><tbody>
+    \${runs.length?runs.map(r=>'<tr><td>'+esc(r.date)+'</td><td><span class="chip '+cls(r.status)+'"><span class=dot></span>'+esc(r.status)+'</span></td><td>'+esc(((r.meta&&r.meta.headline)||'').slice(0,48))+(r.meta&&r.meta.style?' <span class=pill>'+esc(r.meta.style)+'</span>':'')+'</td><td>'+(r.publications||[]).length+'</td></tr>').join(''):'<tr><td colspan=4 class=muted>Sin ejecuciones aún</td></tr>'}
    </tbody></table>
   </div>
   <div class="card"><h3>Experimentos sugeridos</h3>\${exp||'<p class="muted">Recopila métricas para ver recomendaciones.</p>'}</div>\`;
+ $('#editbtn').onclick=()=>{const e=$('#editor');if(e)e.style.display=e.style.display==='none'?'block':'none'};
+ if($('#canceledit'))$('#canceledit').onclick=()=>{$('#editor').style.display='none'};
+ if($('#savecfg'))$('#savecfg').onclick=async ev=>{ev.target.disabled=true;
+  cfg.status=$('#e_status').value;cfg.script.provider.name=$('#e_text').value;cfg.voice.provider=$('#e_voice').value;
+  if($('#e_style')&&cfg.video)cfg.video.style=$('#e_style').value;
+  if(cfg.approval)cfg.approval.required=$('#e_appr').checked;else cfg.approval={required:$('#e_appr').checked};
+  if(cfg.schedule&&cfg.schedule.trigger)cfg.schedule.trigger.at=$('#e_at').value;
+  try{await api('/api/channels/'+encodeURIComponent(id)+'/config',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(cfg)});location.reload()}
+  catch(e){alert('Error al guardar: '+e.message);ev.target.disabled=false}};
+ $('#regenbtn').onclick=async ev=>{const date=(last&&last.date)||(runs[0]&&runs[0].date);if(!date){alert('Ejecuta primero un ciclo');return}
+  ev.target.disabled=true;ev.target.innerHTML='<span class="spin"></span>…';
+  try{const o=await api('/api/channels/'+encodeURIComponent(id)+'/regenerate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date,reroll:true})});alert('Regenerado: '+(o.headline||o.status));location.reload()}
+  catch(e){alert('Error: '+e.message);ev.target.disabled=false;ev.target.textContent='🎲 Regenerar (otro ángulo)'}};
  $('#runbtn').onclick=async ev=>{ev.target.disabled=true;ev.target.innerHTML='<span class="spin"></span> Ejecutando…';
   try{const o=await api('/api/channels/'+encodeURIComponent(id)+'/run',{method:'POST'});alert('Run '+o.status+' — '+(o.detail||''));location.reload()}
   catch(e){alert('Error: '+e.message);ev.target.disabled=false;ev.target.textContent='▶ Probar (dry-run)'}};

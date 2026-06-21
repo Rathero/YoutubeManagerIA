@@ -29,6 +29,7 @@ export class PostgresStore implements Store {
         reason text,
         stages jsonb NOT NULL DEFAULT '[]',
         publications jsonb NOT NULL DEFAULT '[]',
+        meta jsonb NOT NULL DEFAULT '{}',
         created_at timestamptz NOT NULL DEFAULT now()
       );
       CREATE INDEX IF NOT EXISTS runs_channel_date ON runs (channel_id, date);
@@ -45,10 +46,10 @@ export class PostgresStore implements Store {
   async saveRun(r: RunRecord): Promise<void> {
     await this.ready;
     await this.pool.query(
-      `INSERT INTO runs (run_id, channel_id, date, status, reason, stages, publications, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-       ON CONFLICT (run_id) DO UPDATE SET status=$4, reason=$5, stages=$6, publications=$7`,
-      [r.runId, r.channelId, r.date, r.status, r.reason ?? null, JSON.stringify(r.stages), JSON.stringify(r.publications), r.createdAt],
+      `INSERT INTO runs (run_id, channel_id, date, status, reason, stages, publications, meta, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (run_id) DO UPDATE SET status=$4, reason=$5, stages=$6, publications=$7, meta=$8`,
+      [r.runId, r.channelId, r.date, r.status, r.reason ?? null, JSON.stringify(r.stages), JSON.stringify(r.publications), JSON.stringify(r.meta ?? {}), r.createdAt],
     );
   }
 
@@ -74,6 +75,7 @@ export class PostgresStore implements Store {
       reason: row.reason ?? undefined,
       stages: row.stages,
       publications: row.publications,
+      meta: row.meta ?? undefined,
       createdAt: new Date(row.created_at).toISOString(),
     };
   }
@@ -92,6 +94,7 @@ export class PostgresStore implements Store {
       reason: row.reason ?? undefined,
       stages: row.stages,
       publications: row.publications,
+      meta: row.meta ?? undefined,
       createdAt: new Date(row.created_at).toISOString(),
     }));
   }

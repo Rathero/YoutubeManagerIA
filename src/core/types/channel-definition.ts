@@ -276,6 +276,8 @@ const ScheduleSchema = z.object({
 const KpisSchema = z.object({
   targets: z.record(z.number()).default({}),
   review_after_days: z.number().int().positive().default(28),
+  /** Soft monthly AI-spend cap (USD). 0/undefined = no cap. Surfaces a warning when exceeded. */
+  budget_usd_month: z.number().nonnegative().optional(),
 });
 
 export const ChannelDefinitionSchema = z.object({

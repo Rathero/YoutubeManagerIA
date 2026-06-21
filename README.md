@@ -302,6 +302,11 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 - **Multi-idioma:** `factory localize <canal> --to en,pt,fr` deriva canales hijos traducidos
   (LLM si hay clave) listos para activar.
 - **Coste:** `factory estimate <canal>` calcula el gasto mensual por proveedor (local = $0).
+- **Tope de presupuesto:** `kpis.budget_usd_month` marca un máximo mensual; `estimate` y cada
+  ejecución avisan (🟡 ≥80%, 🔴 por encima) sin bloquear el ciclo.
+- **Feeds de syndicación:** `factory feed <canal> --format rss|json` (o los endpoints públicos
+  `/feed/<canal>.xml` y `/feed/<canal>.json` del dashboard) publican un RSS 2.0 / JSON Feed 1.1
+  con las piezas publicadas, para reutilizar el contenido en webs o newsletters.
 - **YouTube auto:** sube además **miniatura** y **subtítulos** tras el vídeo (best-effort).
 
 ---

@@ -104,6 +104,28 @@ export function startDashboard(port = 8787): ReturnType<typeof createServer> {
         return res.end(UI_HTML);
       }
       if (path === "/api/health") return send(res, 200, { ok: true, tenant: tenant() || "default" });
+
+      // Public syndication feeds (no token gate) — RSS/JSON of a channel's published runs.
+      const feedMatch = path.match(/^\/feed\/([^/]+)\.(xml|rss|json)$/);
+      if (feedMatch) {
+        const id = decodeURIComponent(feedMatch[1]!);
+        const ext = feedMatch[2];
+        try {
+          const def = await loadChannelDefinition(resolve(configDir(), `${id}.yaml`));
+          const store = await getStore();
+          const runs = await store.listRuns(id, 100);
+          const { buildRssFeed, buildJsonFeed } = await import("../distribution/feed.js");
+          const site = `http://${req.headers.host ?? ""}`;
+          if (ext === "json") {
+            res.setHeader("content-type", "application/feed+json; charset=utf-8");
+            return res.end(buildJsonFeed(def, runs as any, site));
+          }
+          res.setHeader("content-type", "application/rss+xml; charset=utf-8");
+          return res.end(buildRssFeed(def, runs as any, site));
+        } catch {
+          return send(res, 404, { error: "channel not found" });
+        }
+      }
       if (path === "/api/hardware") {
         const { detectHardware, recommend } = await import("./hardware.js");
         const hw = await detectHardware();

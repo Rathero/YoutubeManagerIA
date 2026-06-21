@@ -118,6 +118,27 @@ program
   });
 
 program
+  .command("feed")
+  .description("Emit an RSS/JSON syndication feed of a channel's published runs")
+  .argument("<channel>", "channel id")
+  .option("-f, --format <fmt>", "rss | json", "rss")
+  .option("-o, --out <file>", "write to a file instead of stdout")
+  .action(async (channel: string, opts: { format: string; out?: string }) => {
+    const { getStore } = await import("../storage/index.js");
+    const { buildRssFeed, buildJsonFeed } = await import("../distribution/feed.js");
+    const dir = (await import("../storage/paths.js")).configDir();
+    const def = await loadChannelDefinition(resolve(dir, `${channel}.yaml`));
+    const runs = await (await getStore()).listRuns(channel, 100);
+    const out = opts.format === "json" ? buildJsonFeed(def, runs as any) : buildRssFeed(def, runs as any);
+    if (opts.out) {
+      await (await import("node:fs/promises")).writeFile(opts.out, out);
+      console.log(`Feed escrito en ${opts.out}`);
+    } else {
+      console.log(out);
+    }
+  });
+
+program
   .command("schedule")
   .description("Preview the next scheduled runs for every active channel")
   .option("-n, --count <n>", "occurrences per channel", "5")

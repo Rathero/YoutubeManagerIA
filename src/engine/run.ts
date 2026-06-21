@@ -4,6 +4,7 @@ import { Orchestrator, type RunOutcome } from "../core/orchestrator/orchestrator
 import type { ChannelDefinition, ContentPayload, FormatScript, RunContext } from "../core/types/index.js";
 import { createLogger } from "../ops/logger.js";
 import { notifyRunOutcome } from "../ops/notify.js";
+import { budgetStatus } from "../ops/estimate.js";
 import { toRunRecord, type Store } from "../storage/store.js";
 import { getStore } from "../storage/index.js";
 import { resolveLlmClient } from "./llm/client.js";
@@ -47,6 +48,13 @@ export async function runChannel(channel: ChannelDefinition, opts: RunOptions = 
   const store = opts.store ?? (await getStore());
   const adapter = getAdapter(channel.data.adapter);
   const llm = withLlmCache(await resolveLlmClient(channel.script.provider));
+
+  // Soft budget guard: warn (never block) when the estimated monthly spend exceeds the cap.
+  const budget = budgetStatus(channel);
+  if (budget.severity === "over" || budget.severity === "warn") {
+    const log = createLogger({ runId: "run", channelId: channel.id, date });
+    log(budget.severity === "over" ? "warn" : "info", `presupuesto: ${budget.message}`, { perMonthUsd: budget.perMonthUsd, capUsd: budget.capUsd });
+  }
 
   const ctx: RunContext = {
     runId: randomUUID(),

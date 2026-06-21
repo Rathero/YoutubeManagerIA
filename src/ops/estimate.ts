@@ -77,6 +77,37 @@ export function estimateChannel(channel: ChannelDefinition): ChannelEstimate {
   };
 }
 
+export interface BudgetStatus {
+  capUsd: number | null;
+  perMonthUsd: number;
+  pctUsed: number | null; // 0..N (1 = at cap)
+  severity: "none" | "ok" | "warn" | "over";
+  message: string;
+}
+
+/**
+ * Compare a channel's estimated monthly AI spend against its soft budget cap. Pure so the
+ * CLI, dashboard, and run guard all share one verdict. `warn` at ≥80% of cap, `over` above it.
+ */
+export function budgetStatus(channel: ChannelDefinition, estimate?: ChannelEstimate): BudgetStatus {
+  const e = estimate ?? estimateChannel(channel);
+  const cap = channel.kpis?.budget_usd_month;
+  if (!cap || cap <= 0) {
+    return { capUsd: null, perMonthUsd: e.perMonthUsd, pctUsed: null, severity: "none", message: "Sin tope de presupuesto." };
+  }
+  const pct = e.perMonthUsd / cap;
+  if (pct > 1) {
+    return { capUsd: cap, perMonthUsd: e.perMonthUsd, pctUsed: pct, severity: "over",
+      message: `Estimado $${e.perMonthUsd}/mes supera el tope $${cap} (${Math.round(pct * 100)}%).` };
+  }
+  if (pct >= 0.8) {
+    return { capUsd: cap, perMonthUsd: e.perMonthUsd, pctUsed: pct, severity: "warn",
+      message: `Estimado $${e.perMonthUsd}/mes al ${Math.round(pct * 100)}% del tope $${cap}.` };
+  }
+  return { capUsd: cap, perMonthUsd: e.perMonthUsd, pctUsed: pct, severity: "ok",
+    message: `Estimado $${e.perMonthUsd}/mes dentro del tope $${cap} (${Math.round(pct * 100)}%).` };
+}
+
 // ── Self-host (infra) comparison ────────────────────────────────────────────────
 const GPU_HR_USD = Number(process.env.FACTORY_GPU_HR_USD ?? 0.26); // spot RTX 3090
 const CPU_VM_MO_USD = Number(process.env.FACTORY_CPU_VM_MO_USD ?? 7); // Hetzner CX32-ish
@@ -165,6 +196,11 @@ export function formatEstimate(channel: ChannelDefinition, e: ChannelEstimate): 
     lines.push(`  Por ciclo:  $${e.perCycleUsd}`);
     lines.push(`  Por mes:    $${e.perMonthUsd}  (${e.cyclesPerMonth} ciclos)`);
     lines.push(`    texto $${e.breakdown.text} · voz $${e.breakdown.voice} · vídeo/imagen $${e.breakdown.media} · thumbnail $${e.breakdown.thumbnail}`);
+  }
+  const budget = budgetStatus(channel, e);
+  if (budget.severity !== "none") {
+    const icon = budget.severity === "over" ? "🔴" : budget.severity === "warn" ? "🟡" : "🟢";
+    lines.push(`  ${icon} Presupuesto: ${budget.message}`);
   }
   lines.push("  Supuestos: " + e.assumptions.join("; "));
   lines.push("  (Tarifas aproximadas 2026; ajústalas en src/ops/estimate.ts)");

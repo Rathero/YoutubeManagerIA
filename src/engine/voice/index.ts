@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { Stage } from "../../core/pipeline/stage.js";
 import type { AudioAsset } from "../../core/types/index.js";
 import { runDir } from "../../storage/paths.js";
+import { mapLimit } from "../../core/util/concurrency.js";
 import { getTtsProvider, hashText, StubTtsProvider } from "./provider.js";
 
 /**
@@ -21,8 +22,8 @@ export function createVoiceStage(): Stage {
       const dir = join(runDir(ctx.channel.id, ctx.date), "audio");
 
       const stub = new StubTtsProvider(ctx.channel.voice.speed);
-      const audio: AudioAsset[] = [];
-      for (const script of ctx.scripts) {
+      // Synthesize formats in parallel (independent files), capped for provider safety.
+      const audio: AudioAsset[] = await mapLimit(ctx.scripts, 3, async (script) => {
         const textHash = hashText(script.narration);
         const outPath = join(dir, `${script.format}-${textHash}.audio`);
         let res;
@@ -35,14 +36,14 @@ export function createVoiceStage(): Stage {
           res = await stub.synthesize({ text: script.narration, outPath });
           usedStub = true;
         }
-        audio.push({
+        return {
           format: script.format,
           path: res.path,
           durationSec: res.durationSec,
           loudnessLufs: usedStub ? -14 : undefined,
           textHash: res.textHash,
-        });
-      }
+        };
+      });
       ctx.audio = audio;
       ctx.log("info", "voice synthesized", { tracks: audio.length, provider: provider.name });
     },

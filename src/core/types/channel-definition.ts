@@ -292,6 +292,12 @@ export const ChannelDefinitionSchema = z.object({
       titles: z.boolean().default(true),
     })
     .default({ titles: true }),
+  /** Human approval gate: when required, runs build everything but hold publishing. */
+  approval: z
+    .object({
+      required: z.boolean().default(false),
+    })
+    .default({ required: false }),
 });
 
 export type ChannelDefinition = z.infer<typeof ChannelDefinitionSchema>;

@@ -225,6 +225,87 @@ program
     if (opts.open) openBrowser(url);
   });
 
+function collect(v: string, acc: string[]): string[] {
+  acc.push(v);
+  return acc;
+}
+
+program
+  .command("backlog")
+  .description("Manage a channel's idea backlog (consumed by the generative adapter)")
+  .argument("<channel>", "channel id")
+  .option("--add <idea>", "add an idea (repeatable)", collect, [])
+  .action(async (channel: string, opts: { add: string[] }) => {
+    const { addToBacklog, loadBacklog } = await import("../storage/backlog.js");
+    if (opts.add.length) {
+      const n = await addToBacklog(channel, opts.add);
+      console.log(`Añadidas ${n} idea(s) al backlog de ${channel}.`);
+    }
+    const items = await loadBacklog(channel);
+    console.log(`\nBacklog de ${channel} (${items.length}):`);
+    for (const it of items) console.log(`  ${it.usedDate ? "✓ " + it.usedDate : "·         "}  ${it.angle}`);
+    if (items.length === 0) console.log("  (vacío — añade con --add \"idea\")");
+  });
+
+program
+  .command("run-all")
+  .description("Run one cycle for every active channel (bulk)")
+  .option("-d, --date <iso>", "target date (YYYY-MM-DD)")
+  .option("--dry-run", "do everything except publishing", false)
+  .action(async (opts: { date?: string; dryRun?: boolean }) => {
+    const { configDir } = await import("../storage/paths.js");
+    const { readdir } = await import("node:fs/promises");
+    const dir = configDir();
+    const files = (await readdir(dir).catch(() => [])).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"));
+    let ran = 0;
+    for (const f of files) {
+      try {
+        const def = await loadChannelDefinition(resolve(dir, f));
+        if (def.status !== "active") continue;
+        const o = await runChannel(def, { date: opts.date, dryRun: opts.dryRun });
+        console.log(`  ${def.id}: ${o.status}`);
+        ran++;
+      } catch (e) {
+        console.log(`  ${f}: error ${(e as Error).message}`);
+      }
+    }
+    console.log(`\n${ran} canal(es) activos ejecutados.`);
+  });
+
+program
+  .command("pending")
+  .description("List runs held for approval")
+  .action(async () => {
+    const { listPending } = await import("../storage/pending.js");
+    const recs = await listPending();
+    if (recs.length === 0) return console.log("No hay nada pendiente de aprobación.");
+    console.log("\nPendientes de aprobación:");
+    for (const r of recs) console.log(`  ${r.channelId} ${r.date} — ${r.items.length} salida(s)  (factory approve ${r.channelId} ${r.date})`);
+  });
+
+program
+  .command("approve")
+  .description("Approve & publish a held run")
+  .argument("<channel>", "channel id")
+  .argument("<date>", "run date (YYYY-MM-DD)")
+  .action(async (channel: string, date: string) => {
+    const { approvePending } = await import("../engine/publish/approve.js");
+    const results = await approvePending(channel, date);
+    console.log(`Aprobado ${channel} ${date}:`);
+    for (const r of results) console.log(`  ${r.platform}/${r.format}: ${r.status} ${r.url ?? r.queuedItemPath ?? ""}`);
+  });
+
+program
+  .command("reject")
+  .description("Discard a held run")
+  .argument("<channel>", "channel id")
+  .argument("<date>", "run date (YYYY-MM-DD)")
+  .action(async (channel: string, date: string) => {
+    const { rejectPending } = await import("../engine/publish/approve.js");
+    await rejectPending(channel, date);
+    console.log(`Descartado ${channel} ${date}.`);
+  });
+
 program
   .command("hardware")
   .description("Detect your machine and recommend what you can run locally")

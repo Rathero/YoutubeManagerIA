@@ -25,6 +25,23 @@ export function createPublishStage(store: Store): Stage {
       if (!ctx.metadata || !ctx.rendered) throw new Error("publish: missing metadata/rendered");
       const results: PublishResult[] = [];
 
+      // Approval gate: build everything, but hold publishing for human review.
+      if (ctx.channel.approval.required && !ctx.dryRun) {
+        const { savePending } = await import("../../storage/pending.js");
+        const items = [] as any[];
+        for (const platform of ctx.channel.platforms.filter((p) => p.enabled)) {
+          for (const meta of ctx.metadata.filter((m) => m.platform === platform.id)) {
+            const asset = pickAsset(ctx.rendered, meta.format, platform.id);
+            items.push({ platform: platform.id, format: meta.format, asset: asset ?? { format: meta.format, aspectRatio: "", path: "", durationSec: 0, mimeType: "" }, meta, accountRef: platform.account_ref, mode: platform.mode });
+            results.push({ platform: platform.id, format: meta.format, status: "skipped", message: "pendiente de aprobación" });
+          }
+        }
+        const path = await savePending({ channelId: ctx.channel.id, date: ctx.date, createdAt: new Date().toISOString(), items });
+        ctx.publications = results;
+        ctx.log("info", "publicación retenida para aprobación", { pending: items.length, path });
+        return;
+      }
+
       // Two passes: video platforms first, then text cross-posts (which get the link).
       const enabled = ctx.channel.platforms.filter((p) => p.enabled);
       const videoPlatforms = enabled.filter((p) => !TEXT_PLATFORMS.has(p.id));

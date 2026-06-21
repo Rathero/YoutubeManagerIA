@@ -173,6 +173,8 @@ async function viewChannel(id){
  const runs=d.runs||[];
  const cls=s=>s==='completed'?'ok':s==='failed'?'bad':'warn';
  let exp='';try{const ex=await api('/api/channels/'+encodeURIComponent(id)+'/experiments');exp=ex.map(e=>'<div class="reco"><div class="item" style="grid-column:1/3"><div class="l">'+esc(e.variable)+' · '+esc(e.status)+'</div><div class="v" style="font-size:13px;font-weight:600">'+esc(e.note)+'</div></div></div>').join('')}catch{}
+ let pend=[];try{pend=await api('/api/channels/'+encodeURIComponent(id)+'/pending')}catch{}
+ const pendHtml=pend.length?'<div class="card" style="margin-bottom:18px;border-color:#7c6cff55"><h3>⏳ Pendiente de aprobación</h3>'+pend.map(p=>'<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px"><span>'+esc(p.date)+' · '+p.items.length+' salida(s)</span><span><button class="btn primary" data-ap="'+esc(p.date)+'">Aprobar y publicar</button> <button class="btn ghost" data-rj="'+esc(p.date)+'">Descartar</button></span></div>').join('')+'</div>':'';
  app.innerHTML=\`
   <a class="muted" href="#/channels">← Canales</a>
   <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
@@ -184,6 +186,7 @@ async function viewChannel(id){
    <div class="card kpi"><span class="l">Adapter</span><span class="n" style="font-size:22px">\${esc(d.adapter)}</span></div>
    <div class="card kpi"><span class="l">Vídeo</span><span class="n" style="font-size:22px">\${esc(d.video)} · \${esc(d.style||'-')}</span></div>
   </div>
+  \${pendHtml}
   <div class="card" style="margin-bottom:18px">
    <div class="row" style="justify-content:space-between;align-items:center">
     <h3 style="margin:0">Ejecuciones</h3>
@@ -197,6 +200,10 @@ async function viewChannel(id){
  $('#runbtn').onclick=async ev=>{ev.target.disabled=true;ev.target.innerHTML='<span class="spin"></span> Ejecutando…';
   try{const o=await api('/api/channels/'+encodeURIComponent(id)+'/run',{method:'POST'});alert('Run '+o.status+' — '+(o.detail||''));location.reload()}
   catch(e){alert('Error: '+e.message);ev.target.disabled=false;ev.target.textContent='▶ Probar (dry-run)'}};
+ document.querySelectorAll('[data-ap]').forEach(b=>b.onclick=async()=>{b.disabled=true;
+  try{await api('/api/channels/'+encodeURIComponent(id)+'/approve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:b.dataset.ap})});location.reload()}catch(e){alert('Error: '+e.message);b.disabled=false}});
+ document.querySelectorAll('[data-rj]').forEach(b=>b.onclick=async()=>{if(!confirm('¿Descartar?'))return;
+  try{await api('/api/channels/'+encodeURIComponent(id)+'/reject',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:b.dataset.rj})});location.reload()}catch(e){alert('Error: '+e.message)}});
 }
 
 const CW={topic:'',language:'es-ES',region:'ES',local:false,rec:null,hw:null};

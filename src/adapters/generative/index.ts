@@ -95,7 +95,9 @@ class GenerativeAdapter implements NicheAdapter {
 
   async fetch(ctx: RunContext): Promise<RawData> {
     const cfg = (ctx.channel.data.config ?? {}) as GenerativeConfig;
-    let angle = pickAngle(cfg, ctx, ctx.date);
+    // Managed idea backlog wins over the config rotation when it has items.
+    const { nextForDate } = await import("../../storage/backlog.js");
+    let angle = (await nextForDate(ctx.channel.id, ctx.date)) ?? pickAngle(cfg, ctx, ctx.date);
     // Optionally anchor today's angle to a trending topic relevant to the niche.
     if (cfg.trends?.enabled) {
       try {

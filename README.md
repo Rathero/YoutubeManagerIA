@@ -301,6 +301,19 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 
 ---
 
+## Gestión de contenido y rendimiento
+
+- **Backlog de ideas:** `factory backlog <canal> --add "idea"` mantiene una cola de ángulos
+  que el adapter `generative` consume por fecha (idempotente). Lista con `factory backlog <canal>`.
+- **Anti-repetición (dedup):** el QA avisa si el titular del día repite uno reciente.
+- **Aprobación humana:** `approval.required: true` retiene la publicación; revisa con
+  `factory pending`, publica con `factory approve <canal> <fecha>` o descarta con `reject`
+  (también en la UI, tarjeta "Pendiente de aprobación").
+- **Operaciones en lote:** `factory run-all` ejecuta un ciclo de todos los canales `active`.
+- **Caché de LLM:** respuestas idénticas (system+user) se sirven de disco — ahorra tiempo y
+  coste en re-ejecuciones (desactiva con `FACTORY_LLM_CACHE=0`).
+- **Paralelismo:** voz y subtítulos se generan en paralelo por formato (con límite).
+
 ## Crecimiento, ingresos y operación
 
 - **B-roll de stock gratis:** `render.broll.{enabled,provider}` (Pexels/Pixabay) pone un clip

@@ -147,6 +147,25 @@ export function startDashboard(port = 8787): ReturnType<typeof createServer> {
         return send(res, 200, proposeExperiments(def, await loadMetrics(id)));
       }
 
+      const pendMatch = path.match(/^\/api\/channels\/([^/]+)\/pending$/);
+      if (pendMatch) {
+        const id = decodeURIComponent(pendMatch[1]!);
+        const { listPending } = await import("../storage/pending.js");
+        return send(res, 200, (await listPending()).filter((p) => p.channelId === id));
+      }
+      const approveMatch = path.match(/^\/api\/channels\/([^/]+)\/(approve|reject)$/);
+      if (approveMatch && req.method === "POST") {
+        const id = decodeURIComponent(approveMatch[1]!);
+        const action = approveMatch[2];
+        const body = await readBody(req);
+        const date = body.date as string;
+        if (!date) return send(res, 400, { error: "date required" });
+        const mod = await import("../engine/publish/approve.js");
+        if (action === "approve") return send(res, 200, { results: await mod.approvePending(id, date) });
+        await mod.rejectPending(id, date);
+        return send(res, 200, { ok: true });
+      }
+
       const runMatch = path.match(/^\/api\/channels\/([^/]+)\/run$/);
       if (runMatch && req.method === "POST") {
         const id = decodeURIComponent(runMatch[1]!);

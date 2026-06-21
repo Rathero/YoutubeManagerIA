@@ -18,11 +18,15 @@ describe("A/B title variants", () => {
     expect(v.map((x) => x.id)).toEqual(["A", "B", "C"]);
     expect(v[1]!.title.startsWith("¿")).toBe(true);
   });
-  it("rotates by date when enabled, fixed when disabled", () => {
+  it("rotates by date when enabled, picks best-CTR deterministically when disabled", () => {
     const a = pickTitle("La luz baja", "Canal", true, "2026-06-21", true);
     const b = pickTitle("La luz baja", "Canal", true, "2026-06-22", true);
     expect(a.id === b.id).toBe(false); // different day → likely different variant
-    expect(pickTitle("x", "C", true, "2026-06-21", false).id).toBe("A");
+    // A/B off → deterministic, and prefers the higher-CTR variant (question/emoji beats plain).
+    const off1 = pickTitle("x", "C", true, "2026-06-21", false);
+    const off2 = pickTitle("x", "C", true, "2026-06-30", false);
+    expect(off1.id).toBe(off2.id); // deterministic regardless of date
+    expect(off1.id).not.toBe("A"); // plain variant A is not the highest-CTR choice here
   });
 });
 

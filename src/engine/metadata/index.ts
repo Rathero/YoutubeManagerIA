@@ -6,6 +6,7 @@ import type {
   PlatformMeta,
 } from "../../core/types/index.js";
 import { affiliateForRun } from "../../monetization/affiliate.js";
+import { seoTags, pickBestTitle } from "./seo.js";
 
 function slugHashtag(s: string): string {
   return (
@@ -46,8 +47,9 @@ export function pickTitle(
   abEnabled: boolean,
 ): { id: string; title: string } {
   const variants = titleVariants(headline, channelName, isShort);
-  const idx = abEnabled ? dayIndexFromIso(date) % variants.length : 0;
-  return variants[idx]!;
+  // A/B on → rotate by date for fair attribution; A/B off → pick the highest-CTR title.
+  if (abEnabled) return variants[dayIndexFromIso(date) % variants.length]!;
+  return pickBestTitle(variants);
 }
 
 function baseHashtags(channel: ChannelDefinition): string[] {
@@ -96,6 +98,7 @@ function buildMeta(
       title: title.slice(0, 100),
       description: description.slice(0, 4900),
       hashtags: base.slice(0, 4),
+      tags: seoTags(channel, payload),
       extra: { isShort: format === "short", titleVariant: variant.id },
     };
   }

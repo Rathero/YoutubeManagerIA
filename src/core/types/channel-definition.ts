@@ -54,6 +54,8 @@ const NicheSchema = z.object({
   topic: z.string(),
   audience: z.string(),
   value_proposition: z.string(),
+  /** Explicit high-intent SEO keywords seeded into the YouTube `tags` field. */
+  keywords: z.array(z.string()).default([]),
   monetization: MonetizationSchema,
   /**
    * What kind of content this channel produces — drives QA strictness:

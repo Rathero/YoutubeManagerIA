@@ -51,6 +51,8 @@ export interface PlatformMeta {
   title: string;
   description: string;
   hashtags: string[];
+  /** SEO keyword tags (YouTube `tags` field) — plain keywords, not #hashtags. */
+  tags?: string[];
   /** YouTube-only: helps mark as a Short, search optimisation, etc. */
   extra?: Record<string, unknown>;
 }

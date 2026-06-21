@@ -19,7 +19,7 @@ export class YouTubePublisher implements Publisher {
     channelId: string;
     date: string;
     asset: { format: any; aspectRatio: string; path: string; mimeType: string; durationSec: number };
-    meta: { platform: any; format: any; title: string; description: string; hashtags: string[]; extra?: Record<string, unknown> };
+    meta: { platform: any; format: any; title: string; description: string; hashtags: string[]; tags?: string[]; extra?: Record<string, unknown> };
     account: { ref: string; mode: "auto" | "assisted" };
     dryRun: boolean;
   }): Promise<PublishResult> {
@@ -46,7 +46,8 @@ export class YouTubePublisher implements Publisher {
       const externalId = await this.resumableUpload(token!, asset.path, {
         title: meta.title,
         description: meta.description,
-        tags: meta.hashtags.map((h) => h.replace(/^#/, "")),
+        // SEO keyword tags + hashtag-derived tags, deduped (YouTube caps ~500 chars).
+        tags: [...new Set([...(meta.tags ?? []), ...meta.hashtags.map((h) => h.replace(/^#/, ""))])].slice(0, 20),
         isShort: Boolean(meta.extra?.isShort),
       });
 

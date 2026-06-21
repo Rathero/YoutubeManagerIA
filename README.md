@@ -292,7 +292,11 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 - **Moderación:** etapa `moderation` (blocklist determinista + LLM opcional) **bloquea** la
   publicación de contenido prohibido antes de gastar en media (`moderation` en la config).
 - **A/B de títulos:** `ab_testing.titles` rota variantes de título por día; el feedback
-  (`factory feedback`) atribuye cuál rinde más.
+  (`factory feedback`) atribuye cuál rinde más. Con A/B **desactivado**, se elige el título
+  con mayor *score* de CTR (longitud óptima, número, gancho de curiosidad, emoji, *power words*).
+- **SEO tags de YouTube:** la metadata genera *keywords* (campo `tags`, no hashtags) a partir
+  de `niche.topic` + `niche.keywords` + palabras salientes del titular, deduplicadas y dentro
+  del presupuesto de ~500 caracteres de YouTube.
 - **Distribución propia:** `distribution_own.newsletter`/`telegram_bot` emite una edición en
   texto/Markdown del payload (a fichero siempre; a Buttondown/Telegram si hay credenciales).
 - **Multi-idioma:** `factory localize <canal> --to en,pt,fr` deriva canales hijos traducidos

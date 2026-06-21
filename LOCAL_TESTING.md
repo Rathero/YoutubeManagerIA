@@ -10,6 +10,10 @@ Eso **lo automatiza casi todo** y al final te abre la interfaz web. No necesitas
 clave ni servicio: corre en **modo demo ($0)**. Lo único que tienes que tener antes es
 **Node.js 20+**.
 
+> ¿Quieres que además **instale la IA local** (Ollama + Kokoro)? Añade `--local` (necesita
+> Docker): `npm run quickstart -- --local`  ·  Windows: `npm run quickstart:win -- -Local`.
+> El quickstart por defecto **no** instala LLMs locales; eso lo hace `npm run setup:local`.
+
 ---
 
 ## Lo que hace el quickstart por ti (automático)

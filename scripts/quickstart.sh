@@ -35,6 +35,20 @@ if [ "${SKIP_TESTS:-0}" = "1" ]; then warn "saltado (SKIP_TESTS=1)"; else
   npm run -s test >/dev/null 2>&1 && ok "tests OK" || warn "algún test falló (revisa con: npm test)"
 fi
 
+# 4b. (Opcional) IA local: --local o LOCAL=1 monta Ollama + Kokoro vía Docker.
+WANT_LOCAL="${LOCAL:-0}"
+for a in "$@"; do [ "$a" = "--local" ] && WANT_LOCAL=1; done
+if [ "$WANT_LOCAL" = "1" ]; then
+  say "4b   Instalando IA local (Ollama + Kokoro)"
+  if command -v docker >/dev/null 2>&1; then
+    bash scripts/setup-local.sh && ok "IA local lista (texto + voz). ComfyUI imagen/vídeo: opcional (GPU)."
+  else
+    warn "Docker no encontrado → instálalo (https://www.docker.com/products/docker-desktop/) y reejecuta con --local"
+  fi
+else
+  warn "IA local NO instalada (modo demo \$0). Para montarla: 'npm run quickstart -- --local' o 'npm run setup:local'."
+fi
+
 # 5. Offline demo (no keys, $0)
 say "5/7  Demo offline: generando un ciclo del canal de ejemplo (luz-es)"
 npm run -s factory -- validate luz-es >/dev/null && ok "config válida"

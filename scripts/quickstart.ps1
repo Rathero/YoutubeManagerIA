@@ -4,7 +4,7 @@
 #
 #   npm run quickstart:win
 #   powershell -ExecutionPolicy Bypass -File scripts/quickstart.ps1 -Port 8787
-param([int]$Port = 8787, [switch]$SkipTests)
+param([int]$Port = 8787, [switch]$SkipTests, [switch]$Local)
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 
@@ -28,6 +28,12 @@ if(Test-Path .env){Ok ".env ya existe"}else{Copy-Item .env.example .env; Ok ".en
 
 Say "4/7  Verificando (typecheck + tests)"
 if($SkipTests){Warn "saltado"}else{ npm run -s typecheck; Ok "typecheck OK"; npm run -s test *> $null; if($LASTEXITCODE -eq 0){Ok "tests OK"}else{Warn "algun test fallo (npm test)"} }
+
+if($Local){
+  Say "4b   Instalando IA local (Ollama + Kokoro)"
+  if(Get-Command docker -ErrorAction SilentlyContinue){ powershell -ExecutionPolicy Bypass -File scripts/setup-local.ps1; Ok "IA local lista (texto + voz). ComfyUI: opcional (GPU)." }
+  else { Warn "Docker no encontrado -> instala Docker Desktop y reejecuta con -Local" }
+} else { Warn "IA local NO instalada (modo demo). Para montarla: 'npm run quickstart:win -- -Local' o 'npm run setup:local:win'." }
 
 Say "5/7  Demo offline: ciclo del canal de ejemplo (luz-es)"
 npm run -s factory -- validate luz-es | Out-Null; Ok "config valida"

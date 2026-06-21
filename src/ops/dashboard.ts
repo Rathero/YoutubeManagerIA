@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { spawn } from "node:child_process";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { stringify as toYaml } from "yaml";
@@ -72,6 +73,17 @@ async function loadMetrics(id: string): Promise<any[]> {
     return JSON.parse(await readFile(resolve(dbDir(), "metrics", `${id}.json`), "utf8"));
   } catch {
     return [];
+  }
+}
+
+/** Open the default browser at a URL (best-effort, cross-platform). */
+export function openBrowser(url: string): void {
+  const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
+  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+  try {
+    spawn(cmd, args, { stdio: "ignore", detached: true }).unref();
+  } catch {
+    /* ignore */
   }
 }
 

@@ -212,12 +212,15 @@ program
 
 program
   .command("dashboard")
-  .description("Serve a small web dashboard (channels, runs, cost)")
+  .description("Serve the web dashboard / SaaS UI (channels, runs, cost, create wizard)")
   .option("-p, --port <port>", "port", "8787")
-  .action(async (opts: { port: string }) => {
-    const { startDashboard } = await import("../ops/dashboard.js");
+  .option("--open", "open the browser automatically", false)
+  .action(async (opts: { port: string; open?: boolean }) => {
+    const { startDashboard, openBrowser } = await import("../ops/dashboard.js");
     startDashboard(Number(opts.port));
-    console.log(`Dashboard en http://localhost:${opts.port}  (Ctrl+C para salir)`);
+    const url = `http://localhost:${opts.port}`;
+    console.log(`\n  🏭 Channel Factory UI → ${url}\n  (Ctrl+C para salir)\n`);
+    if (opts.open) openBrowser(url);
   });
 
 program

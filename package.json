@@ -13,6 +13,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "factory": "tsx src/ops/cli.ts",
+    "quickstart": "bash scripts/quickstart.sh",
+    "quickstart:win": "powershell -ExecutionPolicy Bypass -File scripts/quickstart.ps1",
+    "demo": "tsx src/ops/cli.ts run luz-es --date 2026-06-21",
+    "ui": "tsx src/ops/cli.ts dashboard --open",
+    "verify": "bash scripts/verify.sh",
     "doctor": "tsx src/ops/cli.ts doctor",
     "setup:local": "bash scripts/setup-local.sh",
     "setup:local:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-local.ps1",

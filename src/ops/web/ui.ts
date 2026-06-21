@@ -92,8 +92,12 @@ const $=(s,e=document)=>e.querySelector(s);
 const app=$('#app');
 // Lightweight i18n for the navigation/shell.
 const LANG=localStorage.getItem('cf_lang')||'es';
-const I18N={es:{home:'Inicio',create:'Crear canal',channels:'Canales',library:'Biblioteca',calendar:'Calendario',setup:'Estado local'},
- en:{home:'Home',create:'Create channel',channels:'Channels',library:'Library',calendar:'Calendar',setup:'Local status'}};
+const I18N={es:{home:'Inicio',create:'Crear canal',channels:'Canales',library:'Biblioteca',calendar:'Calendario',setup:'Estado local',
+  heroT:'Crea canales faceless automáticos ✨',heroS:'Describe una temática y el sistema elige modelo, estilo y voz por ti. Cloud o 100% local.',
+  kChannels:'Canales',kCost:'Coste estimado',kActive:'Activos',aiStatus:'Estado de IA local ($0)',yourMachine:'Tu equipo'},
+ en:{home:'Home',create:'Create channel',channels:'Channels',library:'Library',calendar:'Calendar',setup:'Local status',
+  heroT:'Create automated faceless channels ✨',heroS:'Describe a topic and the system picks the model, style and voice for you. Cloud or fully local.',
+  kChannels:'Channels',kCost:'Est. cost',kActive:'Active',aiStatus:'Local AI status ($0)',yourMachine:'Your machine'}};
 const t=k=>(I18N[LANG]||I18N.es)[k]||k;
 function applyI18n(){document.querySelectorAll('[data-t]').forEach(el=>{el.textContent=t(el.dataset.t)});const s=$('#lang');if(s){s.value=LANG;s.onchange=()=>{localStorage.setItem('cf_lang',s.value);location.reload()}}}
 // Token (for protected/public dashboards): open with ?token=XYZ once; it's remembered.
@@ -117,17 +121,17 @@ async function viewHome(){
  const chip=(ok,l)=>'<span class="chip '+(ok?'ok':'bad')+'"><span class="dot"></span>'+l+'</span>';
  app.innerHTML=\`
   <div class="banner">
-   <div class="h1">Crea canales faceless automáticos ✨</div>
-   <p class="sub">Describe una temática y el sistema elige modelo, estilo y voz por ti. Cloud o 100% local.</p>
-   <a class="btn primary" href="#/create">✨ Crear un canal</a>
+   <div class="h1">\${t('heroT')}</div>
+   <p class="sub">\${t('heroS')}</p>
+   <a class="btn primary" href="#/create">✨ \${t('create')}</a>
   </div>
   <div class="grid cards" style="margin-bottom:22px">
-   <div class="card kpi"><span class="l">Canales</span><span class="n">\${ch.length}</span></div>
-   <div class="card kpi"><span class="l">Coste estimado</span><span class="n">$\${Math.round(cost)}<span class="muted" style="font-size:14px">/mes</span></span></div>
-   <div class="card kpi"><span class="l">Activos</span><span class="n">\${ch.filter(c=>c.status==='active').length}</span></div>
+   <div class="card kpi"><span class="l">\${t('kChannels')}</span><span class="n">\${ch.length}</span></div>
+   <div class="card kpi"><span class="l">\${t('kCost')}</span><span class="n">$\${Math.round(cost)}<span class="muted" style="font-size:14px">/mes</span></span></div>
+   <div class="card kpi"><span class="l">\${t('kActive')}</span><span class="n">\${ch.filter(c=>c.status==='active').length}</span></div>
   </div>
   <div class="card">
-   <h3>Estado de IA local ($0)</h3>
+   <h3>\${t('aiStatus')}</h3>
    <div class="row" style="margin-top:10px">
     \${chip(doc.llm,'LLM '+(doc.llm?'online':'offline'))}
     \${chip(doc.tts,'Voz '+(doc.tts?'online':'offline'))}
@@ -144,7 +148,7 @@ function hwCard(h){
  const tag=(ok,txt)=>'<span class="chip '+(ok?'ok':'warn')+'"><span class=dot></span>'+txt+'</span>';
  const llm={'small':'LLM 3-4B','medium':'LLM 8-14B','large':'LLM 70B','cloud-only':'LLM solo nube'}[r.localLLM];
  return \`<div class="card" style="margin-top:16px">
-   <div class="row" style="justify-content:space-between;align-items:center"><h3>Tu equipo</h3><span class="muted">\${hw.ramGB}GB RAM · \${hw.cpus} CPU · \${esc(gpu)}</span></div>
+   <div class="row" style="justify-content:space-between;align-items:center"><h3>\${t('yourMachine')}</h3><span class="muted">\${hw.ramGB}GB RAM · \${hw.cpus} CPU · \${esc(gpu)}</span></div>
    <p class="muted" style="margin:6px 0 10px">Lo que puedes correr en local ($0):</p>
    <div class="row">
     \${tag(r.localLLM!=='cloud-only',llm)}
@@ -190,7 +194,12 @@ async function viewChannel(id){
  const editor=cfg?\`<div class="card" id="editor" style="display:none;margin-bottom:18px">
    <h3>Editar canal</h3>
    <div class="reco" style="margin-top:8px">
+    <div class="item"><div class="l">Nombre</div><input id="e_name" value="\${esc(cfg.identity.name)}"/></div>
     <div class="item"><div class="l">Estado</div><select id="e_status">\${['draft','active','paused','archived'].map(v=>opt(v,cfg.status)).join('')}</select></div>
+    <div class="item"><div class="l">Color fondo</div><input type="color" id="e_bg" value="\${esc(cfg.identity.brand.palette.bg||'#0b1220')}"/></div>
+    <div class="item"><div class="l">Color texto</div><input type="color" id="e_fg" value="\${esc(cfg.identity.brand.palette.fg||'#ffffff')}"/></div>
+    <div class="item"><div class="l">Color acento</div><input type="color" id="e_accent" value="\${esc(cfg.identity.brand.palette.accent||'#3b82f6')}"/></div>
+    <div class="item"><div class="l">Tipografía</div><input id="e_font" value="\${esc(cfg.identity.brand.fonts.heading||'Inter')}"/></div>
     <div class="item"><div class="l">Proveedor de texto</div><select id="e_text">\${['auto','anthropic','openai','gemini','local'].map(v=>opt(v,cfg.script.provider.name)).join('')}</select></div>
     <div class="item"><div class="l">Voz</div><select id="e_voice">\${['stub','elevenlabs','openai','google','kokoro','piper'].map(v=>opt(v,cfg.voice.provider)).join('')}</select></div>
     \${cfg.video?'<div class="item"><div class="l">Estilo</div><select id="e_style">'+styleOpts.map(v=>opt(v,cfg.video.style)).join('')+'</select></div>':''}
@@ -236,6 +245,9 @@ async function viewChannel(id){
  if($('#canceledit'))$('#canceledit').onclick=()=>{$('#editor').style.display='none'};
  if($('#savecfg'))$('#savecfg').onclick=async ev=>{ev.target.disabled=true;
   cfg.status=$('#e_status').value;cfg.script.provider.name=$('#e_text').value;cfg.voice.provider=$('#e_voice').value;
+  cfg.identity.name=$('#e_name').value;
+  cfg.identity.brand.palette.bg=$('#e_bg').value;cfg.identity.brand.palette.fg=$('#e_fg').value;cfg.identity.brand.palette.accent=$('#e_accent').value;
+  cfg.identity.brand.fonts.heading=$('#e_font').value;cfg.identity.brand.fonts.body=$('#e_font').value;
   if($('#e_style')&&cfg.video)cfg.video.style=$('#e_style').value;
   if(cfg.approval)cfg.approval.required=$('#e_appr').checked;else cfg.approval={required:$('#e_appr').checked};
   if(cfg.schedule&&cfg.schedule.trigger)cfg.schedule.trigger.at=$('#e_at').value;

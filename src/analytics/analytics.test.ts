@@ -28,6 +28,15 @@ describe("deriveFeedback (M6 attribution)", () => {
     expect(time!.confidence).toBeGreaterThan(0);
   });
 
+  it("recommends the best A/B thumbnail variant", () => {
+    const metrics: PublicationMetric[] = [
+      ...Array.from({ length: 6 }, (_, i) => ({ channelId: "c", date: `d${i}`, platform: "youtube", format: "short", publishHour: 21, thumbnailVariant: "B", views: 5000 })),
+      ...Array.from({ length: 6 }, (_, i) => ({ channelId: "c", date: `e${i}`, platform: "youtube", format: "short", publishHour: 21, thumbnailVariant: "A", views: 1500 })),
+    ];
+    const sig = deriveFeedback(metrics).find((s) => s.variable === "thumbnail");
+    expect(sig?.recommendation).toContain("B");
+  });
+
   it("recommends the best format by retention/views", () => {
     const metrics = [
       ...make(6, 21, 3000, "short"),

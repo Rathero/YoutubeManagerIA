@@ -28,13 +28,20 @@ function esc(text: string): string {
   return text.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "’").slice(0, 90);
 }
 
-/** Brand data-card thumbnail via ffmpeg: accent banner + large headline. */
-async function ffmpegThumb(headline: string, w: number, h: number, bg: string, fg: string, accent: string, outPath: string): Promise<void> {
+function dayIndex(date: string): number {
+  const t = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(t) ? Math.floor(t / 86400000) : 0;
+}
+
+/** Brand data-card thumbnail. Variant "B" uses a top banner + top-aligned text. */
+async function ffmpegThumb(headline: string, w: number, h: number, bg: string, fg: string, accent: string, outPath: string, variant: string): Promise<void> {
+  const bannerY = variant === "B" ? Math.round(h * 0.1) : Math.round(h * 0.72);
+  const textY = variant === "B" ? Math.round(h * 0.18) : "(h-text_h)/2";
   const cmd =
     `ffmpeg -y -f lavfi -i color=c=${bg}:s=${w}x${h} -frames:v 1 ` +
-    `-vf "drawbox=x=0:y=${Math.round(h * 0.72)}:w=${w}:h=8:color=${accent}:t=fill,` +
-    `drawtext=text='${esc(headline)}':fontcolor=${fg}:fontsize=${Math.round(w / 16)}:` +
-    `x=(w-text_w)/2:y=(h-text_h)/2:line_spacing=14" "${outPath}"`;
+    `-vf "drawbox=x=0:y=${bannerY}:w=${w}:h=10:color=${accent}:t=fill,` +
+    `drawtext=text='${esc(headline)}':fontcolor=${fg}:fontsize=${Math.round(w / 15)}:` +
+    `x=(w-text_w)/2:y=${textY}:line_spacing=14" "${outPath}"`;
   await pexec(cmd);
 }
 
@@ -65,6 +72,9 @@ export function createThumbnailStage(): Stage {
       const aiImage = imageCfg ? getImageProvider(imageCfg) : null;
       const useAi = Boolean(aiImage && !aiImage.fellBack);
 
+      // A/B: rotate thumbnail layout by date when enabled (attributed via feedback).
+      const variant = ctx.channel.ab_testing.thumbnails ? (dayIndex(ctx.date) % 2 === 0 ? "A" : "B") : "A";
+
       const thumbs: ThumbnailAsset[] = [];
       const formats = [...new Set(ctx.scripts.map((s) => s.format))];
       for (const format of formats) {
@@ -72,25 +82,26 @@ export function createThumbnailStage(): Stage {
         const outPath = join(dir, `${format}.png`);
         try {
           if (useAi) {
-            const prompt = `Eye-catching YouTube thumbnail poster about: ${ctx.payload.headlineFact}. Bold, high contrast, no text.`;
+            const lens = variant === "B" ? "cinematic close-up, dramatic" : "wide, bold, high contrast";
+            const prompt = `Eye-catching YouTube thumbnail poster about: ${ctx.payload.headlineFact}. ${lens}, no text.`;
             const res = await aiImage!.provider.generateImage({ prompt, width: w, height: h, outPath });
-            thumbs.push({ format, path: res.path, mimeType: res.mimeType });
+            thumbs.push({ format, path: res.path, mimeType: res.mimeType, variant });
             continue;
           }
           if (ffmpeg) {
-            await ffmpegThumb(ctx.payload.headlineFact, w, h, bg, fg, accent, outPath);
-            thumbs.push({ format, path: outPath, mimeType: "image/png" });
+            await ffmpegThumb(ctx.payload.headlineFact, w, h, bg, fg, accent, outPath, variant);
+            thumbs.push({ format, path: outPath, mimeType: "image/png", variant });
             continue;
           }
         } catch (err) {
           ctx.log("warn", `thumbnail generation failed for ${format}; writing manifest`, { error: (err as Error).message });
         }
         const manifest = outPath.replace(/\.png$/, ".thumb.json");
-        await writeFile(manifest, JSON.stringify({ kind: "thumbnail-manifest", format, headline: ctx.payload.headlineFact, size: { w, h } }, null, 2));
-        thumbs.push({ format, path: manifest, mimeType: "application/json" });
+        await writeFile(manifest, JSON.stringify({ kind: "thumbnail-manifest", format, variant, headline: ctx.payload.headlineFact, size: { w, h } }, null, 2));
+        thumbs.push({ format, path: manifest, mimeType: "application/json", variant });
       }
       ctx.thumbnails = thumbs;
-      ctx.log("info", "thumbnails built", { count: thumbs.length, ai: useAi });
+      ctx.log("info", "thumbnails built", { count: thumbs.length, ai: useAi, variant });
     },
   };
 }

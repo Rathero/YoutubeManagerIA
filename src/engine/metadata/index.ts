@@ -145,7 +145,7 @@ export function createMetadataStage(): Stage {
           const thumb = ctx.thumbnails?.find((t) => t.format === format);
           const caption = ctx.captions?.find((c) => c.format === format);
           if (thumb || caption) {
-            meta.extra = { ...meta.extra, thumbnailPath: thumb?.path, captionsPath: caption?.path };
+            meta.extra = { ...meta.extra, thumbnailPath: thumb?.path, thumbnailVariant: thumb?.variant, captionsPath: caption?.path };
           }
           metas.push(meta);
         }

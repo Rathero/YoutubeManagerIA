@@ -335,7 +335,13 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 - **Dedup semántico:** con `FACTORY_EMBED=1` el QA compara titulares por **embeddings**
   (coseno), con fallback a Jaccard.
 - **Editor visual de formatos/plataformas:** activa/desactiva formatos y plataformas desde la UI.
-- **i18n de la interfaz:** selector ES/EN en la web.
+- **i18n de la interfaz:** selector ES/EN (navegación + inicio).
+- **Editor de marca/paleta:** nombre, colores (fondo/texto/acento) y tipografía editables en la
+  UI; afectan al render y a las miniaturas.
+- **Métricas reales de YouTube:** `factory metrics:pull <canal>` trae vistas/likes vía Data API
+  (`FACTORY_YT_API_KEY`) y alimenta el feedback/experimentos.
+- **A/B de miniaturas:** `ab_testing.thumbnails` rota 2 maquetaciones por día; el feedback
+  atribuye la ganadora (`thumbnail`).
 
 ## Crecimiento, ingresos y operación
 

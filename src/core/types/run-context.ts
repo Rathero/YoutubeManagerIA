@@ -39,6 +39,8 @@ export interface ThumbnailAsset {
   format: FormatKind;
   path: string;
   mimeType: string;
+  /** A/B variant id (e.g. "A" | "B") when thumbnail testing is on. */
+  variant?: string;
 }
 
 export type PlatformId = "youtube" | "tiktok" | "instagram" | "x" | "bluesky" | "linkedin";

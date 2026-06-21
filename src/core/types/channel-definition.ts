@@ -290,8 +290,9 @@ export const ChannelDefinitionSchema = z.object({
   ab_testing: z
     .object({
       titles: z.boolean().default(true),
+      thumbnails: z.boolean().default(false),
     })
-    .default({ titles: true }),
+    .default({ titles: true, thumbnails: false }),
   /** Human approval gate: when required, runs build everything but hold publishing. */
   approval: z
     .object({

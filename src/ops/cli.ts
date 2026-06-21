@@ -394,6 +394,16 @@ program
   });
 
 program
+  .command("metrics:pull")
+  .description("Pull real YouTube stats into the metrics file (needs FACTORY_YT_API_KEY)")
+  .argument("<channel>", "channel id")
+  .action(async (channel: string) => {
+    const { pullChannelMetrics } = await import("../analytics/youtube.js");
+    const r = await pullChannelMetrics(channel);
+    console.log(r.reason ? `No se actualizó: ${r.reason}` : `Métricas actualizadas: ${r.updated} publicación(es).`);
+  });
+
+program
   .command("metrics:sample")
   .description("Generate synthetic metrics to demo the feedback loop")
   .argument("<channel>", "channel id")

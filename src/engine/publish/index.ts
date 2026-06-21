@@ -39,6 +39,11 @@ export function createPublishStage(store: Store): Stage {
         const path = await savePending({ channelId: ctx.channel.id, date: ctx.date, createdAt: new Date().toISOString(), items });
         ctx.publications = results;
         ctx.log("info", "publicación retenida para aprobación", { pending: items.length, path });
+        const { notify } = await import("../../ops/notify.js");
+        await notify(
+          `🕒 Pendiente de aprobación: ${ctx.channel.id} ${ctx.date} (${items.length} salida(s)).\n` +
+            `Responde:  /approve ${ctx.channel.id} ${ctx.date}   o   /reject ${ctx.channel.id} ${ctx.date}`,
+        );
         return;
       }
 

@@ -326,6 +326,14 @@ program
   });
 
 program
+  .command("telegram")
+  .description("Run the Telegram approval bot (approve/reject held runs from your phone)")
+  .action(async () => {
+    const { runTelegramBot } = await import("./telegram-bot.js");
+    await runTelegramBot();
+  });
+
+program
   .command("hardware")
   .description("Detect your machine and recommend what you can run locally")
   .action(async () => {

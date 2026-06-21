@@ -231,6 +231,13 @@ export function startDashboard(port = 8787): ReturnType<typeof createServer> {
         return send(res, 200, proposeExperiments(def, await loadMetrics(id)));
       }
 
+      const analyticsMatch = path.match(/^\/api\/channels\/([^/]+)\/analytics$/);
+      if (analyticsMatch) {
+        const id = decodeURIComponent(analyticsMatch[1]!);
+        const { analyticsSummary } = await import("../analytics/summary.js");
+        return send(res, 200, analyticsSummary(await loadMetrics(id)));
+      }
+
       const pendMatch = path.match(/^\/api\/channels\/([^/]+)\/pending$/);
       if (pendMatch) {
         const id = decodeURIComponent(pendMatch[1]!);

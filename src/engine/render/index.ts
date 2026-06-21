@@ -6,6 +6,7 @@ import type { LlmClient } from "../llm/client.js";
 import { getRenderEngine } from "./provider.js";
 import { renderGenerative } from "./generative.js";
 import { mixMusicInto } from "./music.js";
+import { applyBranding, brandingActive } from "./branding.js";
 import { getBrollProvider, fetchBroll, brollQuery } from "../broll/provider.js";
 
 /** Map a format to the aspect ratios it should be rendered in. */
@@ -102,6 +103,15 @@ export function createRenderStage(llm: LlmClient | null): Stage {
           if (asset.mimeType !== "video/mp4") continue;
           const mixed = await mixMusicInto(asset.path, music.track, music.volume_db);
           if (mixed) ctx.log("info", "music mixed", { format: asset.format });
+        }
+      }
+
+      // Channel branding (intro/outro stings + logo watermark; no-op without ffmpeg/assets).
+      const branding = ctx.channel.render.branding;
+      if (brandingActive(branding)) {
+        for (const asset of rendered) {
+          if (asset.mimeType !== "video/mp4") continue;
+          await applyBranding(asset.path, branding, ctx.log);
         }
       }
 

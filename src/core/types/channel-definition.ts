@@ -221,6 +221,31 @@ const RenderSchema = z.object({
       provider: z.enum(["pexels", "pixabay", "none"]).default("none"),
     })
     .default({ enabled: false, provider: "none" }),
+  /** Channel branding applied as a post-pass: intro/outro stings + a logo watermark. */
+  branding: z
+    .object({
+      /** Path to a short MP4 prepended to every video (brand sting). */
+      intro: z.string().optional(),
+      /** Path to a short MP4 appended to every video (CTA / subscribe sting). */
+      outro: z.string().optional(),
+      watermark: z
+        .object({
+          enabled: z.boolean().default(false),
+          /** Path to a PNG (ideally with transparency) overlaid on every frame. */
+          path: z.string().optional(),
+          position: z
+            .enum(["top-left", "top-right", "bottom-left", "bottom-right"])
+            .default("top-right"),
+          /** Logo width as a fraction of the video width (0–1). */
+          scale: z.number().positive().max(1).default(0.12),
+          /** 0 = invisible, 1 = opaque. */
+          opacity: z.number().min(0).max(1).default(0.8),
+          /** Pixel margin from the chosen corner. */
+          margin: z.number().int().nonnegative().default(40),
+        })
+        .default({ enabled: false, position: "top-right", scale: 0.12, opacity: 0.8, margin: 40 }),
+    })
+    .default({ watermark: { enabled: false, position: "top-right", scale: 0.12, opacity: 0.8, margin: 40 } }),
 });
 
 const PlatformSchema = z.object({

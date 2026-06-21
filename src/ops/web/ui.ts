@@ -109,6 +109,22 @@ const api=async(u,opt={})=>{
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pill=s=>{const c=s==='active'?'ok':s==='draft'?'warn':'';return '<span class="chip '+c+'"><span class="dot"></span>'+esc(s)+'</span>'};
 const money=n=>n===0?'<span class="chip ok">$0 · local</span>':'$'+n+'<span class="muted">/mes</span>';
+const fmtNum=n=>n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(Math.round(n));
+// Dependency-free SVG charts (no chart lib): bars + a sparkline area for trends.
+function barChart(series,opts){opts=opts||{};const W=opts.w||520,H=opts.h||160,P=26;if(!series.length)return '<p class="muted">Sin datos.</p>';
+ const max=Math.max(1,...series.map(s=>s.value));const n=series.length;const bw=(W-P*2)/n*0.7;const gap=(W-P*2)/n*0.3;
+ const bars=series.map((s,i)=>{const x=P+i*((W-P*2)/n)+gap/2;const h=(H-P*2)*(s.value/max);const y=H-P-h;
+  return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="#7c6cff"><title>'+esc(s.label)+': '+fmtNum(s.value)+'</title></rect>'+
+   '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-8)+'" fill="#8b93a7" font-size="9" text-anchor="middle">'+esc(String(s.label).slice(0,6))+'</text>'}).join('');
+ return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="xMidYMid meet">'+bars+'</svg>'}
+function lineChart(series,opts){opts=opts||{};const W=opts.w||520,H=opts.h||160,P=26;if(series.length<2)return barChart(series,opts);
+ const max=Math.max(1,...series.map(s=>s.value)),min=Math.min(...series.map(s=>s.value));const span=Math.max(1,max-min);
+ const n=series.length;const pts=series.map((s,i)=>{const x=P+i*((W-P*2)/(n-1));const y=H-P-(H-P*2)*((s.value-min)/span);return [x,y]});
+ const path=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+ const area=path+' L'+pts[pts.length-1][0].toFixed(1)+' '+(H-P)+' L'+pts[0][0].toFixed(1)+' '+(H-P)+' Z';
+ const dots=pts.map((p,i)=>'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.5" fill="#7c6cff"><title>'+esc(series[i].label)+': '+fmtNum(series[i].value)+'</title></circle>').join('');
+ return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="xMidYMid meet">'+
+  '<path d="'+area+'" fill="#7c6cff22"/><path d="'+path+'" fill="none" stroke="#7c6cff" stroke-width="2"/>'+dots+'</svg>'}
 function setActive(r){document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.r===r))}
 
 async function viewHome(){
@@ -185,6 +201,7 @@ async function viewChannel(id){
  const runs=d.runs||[];
  const cls=s=>s==='completed'?'ok':s==='failed'?'bad':'warn';
  let exp='';try{const ex=await api('/api/channels/'+encodeURIComponent(id)+'/experiments');exp=ex.map(e=>'<div class="reco"><div class="item" style="grid-column:1/3"><div class="l">'+esc(e.variable)+' · '+esc(e.status)+'</div><div class="v" style="font-size:13px;font-weight:600">'+esc(e.note)+'</div></div></div>').join('')}catch{}
+ let an=null;try{an=await api('/api/channels/'+encodeURIComponent(id)+'/analytics')}catch{}
  let pend=[];try{pend=await api('/api/channels/'+encodeURIComponent(id)+'/pending')}catch{}
  let cfg=null;try{cfg=await api('/api/channels/'+encodeURIComponent(id)+'/config')}catch{}
  let last=null;try{last=await api('/api/channels/'+encodeURIComponent(id)+'/last')}catch{}
@@ -218,6 +235,22 @@ async function viewChannel(id){
    <div style="margin-top:12px"><button class="btn primary" id="saveScript">Guardar y re-renderizar (preview)</button></div>
   </div>\`:'';
  const versCard=versions.length?\`<div class="card" style="margin-bottom:18px"><h3>Versiones de \${esc(last.date)}</h3>\${versions.map(v=>'<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px"><span>'+esc((v.headline||'').slice(0,50))+' <span class=pill>'+esc(v.style||'-')+'</span> · '+v.files.length+' archivo(s)</span><button class="btn ghost" data-promote="'+esc(v.runId)+'">Promover</button></div>').join('')}</div>\`:'';
+ const anCard=(an&&an.totals&&an.totals.publications)?\`<div class="card" style="margin-bottom:18px"><h3>📈 Analítica</h3>
+   <div class="grid cards" style="margin:6px 0 14px">
+    <div class="card kpi"><span class="l">Publicaciones</span><span class="n" style="font-size:22px">\${an.totals.publications}</span></div>
+    <div class="card kpi"><span class="l">Vistas</span><span class="n" style="font-size:22px">\${fmtNum(an.totals.views)}</span></div>
+    <div class="card kpi"><span class="l">Subs</span><span class="n" style="font-size:22px">\${fmtNum(an.totals.subs)}</span></div>
+    <div class="card kpi"><span class="l">Retención media</span><span class="n" style="font-size:22px">\${an.totals.avgRetentionPct||0}%</span></div>
+   </div>
+   <div class="reco" style="margin-top:4px">
+    <div class="item" style="grid-column:1/3"><div class="l">Vistas por día</div>\${lineChart(an.viewsByDate)}</div>
+    <div class="item"><div class="l">Vistas medias por hora de publicación</div>\${barChart(an.viewsByHour)}</div>
+    <div class="item"><div class="l">Vistas medias por formato</div>\${barChart(an.viewsByFormat)}</div>
+    \${(an.viewsByTitleVariant&&an.viewsByTitleVariant.length>1)?'<div class="item"><div class="l">A/B título</div>'+barChart(an.viewsByTitleVariant)+'</div>':''}
+    \${(an.viewsByThumbVariant&&an.viewsByThumbVariant.length>1)?'<div class="item"><div class="l">A/B miniatura</div>'+barChart(an.viewsByThumbVariant)+'</div>':''}
+   </div>
+   \${an.best&&an.best.hour!=null?'<p class="muted" style="margin-top:10px">Mejor hora: <b>'+String(an.best.hour).padStart(2,"0")+':00</b> · Mejor formato: <b>'+esc(an.best.format||'-')+'</b></p>':''}
+  </div>\`:'';
  app.innerHTML=\`
   <a class="muted" href="#/channels">← Canales</a>
   <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
@@ -230,7 +263,7 @@ async function viewChannel(id){
    <div class="card kpi"><span class="l">Adapter</span><span class="n" style="font-size:22px">\${esc(d.adapter)}</span></div>
    <div class="card kpi"><span class="l">Vídeo</span><span class="n" style="font-size:22px">\${esc(d.video)} · \${esc(d.style||'-')}</span></div>
   </div>
-  \${editor}\${pendHtml}\${scriptCard}\${versCard}
+  \${editor}\${pendHtml}\${anCard}\${scriptCard}\${versCard}
   <div class="card" style="margin-bottom:18px">
    <div class="row" style="justify-content:space-between;align-items:center">
     <h3 style="margin:0">Ejecuciones</h3>

@@ -310,6 +310,14 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 - **Aprobación humana:** `approval.required: true` retiene la publicación; revisa con
   `factory pending`, publica con `factory approve <canal> <fecha>` o descarta con `reject`
   (también en la UI, tarjeta "Pendiente de aprobación").
+- **Aprobación desde el móvil (Telegram):** `factory telegram` arranca un bot que escucha
+  `/pending`, `/approve <canal> <fecha>` y `/reject <canal> <fecha>`; cuando un ciclo queda
+  retenido recibes un aviso con los comandos listos para responder. Solo obedece a tu
+  `TELEGRAM_CHAT_ID`.
+- **Analítica con gráficos:** la ficha del canal muestra vistas por día (tendencia), por hora
+  de publicación y por formato, además de comparativas A/B de título/miniatura (SVG, sin libs).
+- **Branding de vídeo:** `render.branding` añade careta de entrada/salida (intro/outro) y una
+  marca de agua (logo PNG con posición, escala y opacidad) como post-pase de render.
 - **Operaciones en lote:** `factory run-all` ejecuta un ciclo de todos los canales `active`.
 - **Caché de LLM:** respuestas idénticas (system+user) se sirven de disco — ahorra tiempo y
   coste en re-ejecuciones (desactiva con `FACTORY_LLM_CACHE=0`).

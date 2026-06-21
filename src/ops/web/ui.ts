@@ -202,6 +202,7 @@ async function viewChannel(id){
  const cls=s=>s==='completed'?'ok':s==='failed'?'bad':'warn';
  let exp='';try{const ex=await api('/api/channels/'+encodeURIComponent(id)+'/experiments');exp=ex.map(e=>'<div class="reco"><div class="item" style="grid-column:1/3"><div class="l">'+esc(e.variable)+' · '+esc(e.status)+'</div><div class="v" style="font-size:13px;font-weight:600">'+esc(e.note)+'</div></div></div>').join('')}catch{}
  let an=null;try{an=await api('/api/channels/'+encodeURIComponent(id)+'/analytics')}catch{}
+ let sched=null;try{sched=await api('/api/channels/'+encodeURIComponent(id)+'/schedule')}catch{}
  let pend=[];try{pend=await api('/api/channels/'+encodeURIComponent(id)+'/pending')}catch{}
  let cfg=null;try{cfg=await api('/api/channels/'+encodeURIComponent(id)+'/config')}catch{}
  let last=null;try{last=await api('/api/channels/'+encodeURIComponent(id)+'/last')}catch{}
@@ -222,6 +223,11 @@ async function viewChannel(id){
     \${cfg.video?'<div class="item"><div class="l">Estilo</div><select id="e_style">'+styleOpts.map(v=>opt(v,cfg.video.style)).join('')+'</select></div>':''}
     <div class="item"><div class="l">Aprobación humana</div><label class="toggle"><input type="checkbox" id="e_appr" \${cfg.approval&&cfg.approval.required?'checked':''}/> <span>requerida</span></label></div>
     <div class="item"><div class="l">Hora publicación (cron)</div><input id="e_at" value="\${esc((cfg.schedule&&cfg.schedule.trigger&&cfg.schedule.trigger.at)||'')}"/></div>
+    <div class="item"><div class="l">Marca de agua (logo)</div><label class="toggle"><input type="checkbox" id="e_wm" \${cfg.render&&cfg.render.branding&&cfg.render.branding.watermark&&cfg.render.branding.watermark.enabled?'checked':''}/> <span>activada</span></label></div>
+    <div class="item"><div class="l">Logo (ruta PNG)</div><input id="e_wm_path" placeholder="assets/logo.png" value="\${esc((cfg.render&&cfg.render.branding&&cfg.render.branding.watermark&&cfg.render.branding.watermark.path)||'')}"/></div>
+    <div class="item"><div class="l">Posición marca</div><select id="e_wm_pos">\${['top-right','top-left','bottom-right','bottom-left'].map(v=>opt(v,(cfg.render&&cfg.render.branding&&cfg.render.branding.watermark&&cfg.render.branding.watermark.position)||'top-right')).join('')}</select></div>
+    <div class="item"><div class="l">Intro (mp4)</div><input id="e_intro" placeholder="assets/intro.mp4" value="\${esc((cfg.render&&cfg.render.branding&&cfg.render.branding.intro)||'')}"/></div>
+    <div class="item"><div class="l">Outro (mp4)</div><input id="e_outro" placeholder="assets/outro.mp4" value="\${esc((cfg.render&&cfg.render.branding&&cfg.render.branding.outro)||'')}"/></div>
     <div class="item" style="grid-column:1/3"><div class="l">Formatos activos</div>\${cfg.formats.map((f,i)=>'<label class="toggle" style="display:inline-flex;margin:4px 8px 0 0;width:auto"><input type="checkbox" data-fmt="'+i+'" '+(f.enabled?'checked':'')+'/> <span>'+esc(f.kind)+'</span></label>').join('')}</div>
     <div class="item" style="grid-column:1/3"><div class="l">Plataformas activas</div>\${cfg.platforms.map((p,i)=>'<label class="toggle" style="display:inline-flex;margin:4px 8px 0 0;width:auto"><input type="checkbox" data-plat="'+i+'" '+(p.enabled?'checked':'')+'/> <span>'+esc(p.id)+'</span></label>').join('')}</div>
    </div>
@@ -251,6 +257,10 @@ async function viewChannel(id){
    </div>
    \${an.best&&an.best.hour!=null?'<p class="muted" style="margin-top:10px">Mejor hora: <b>'+String(an.best.hour).padStart(2,"0")+':00</b> · Mejor formato: <b>'+esc(an.best.format||'-')+'</b></p>':''}
   </div>\`:'';
+ const schedCard=(sched&&sched.runs&&sched.runs.length)?\`<div class="card" style="margin-bottom:18px"><h3>🗓️ Próximas ejecuciones</h3>
+   <p class="muted" style="margin:2px 0 8px">Trigger <b>\${esc(sched.at||'-')}</b> · zona \${esc(sched.timezone||'UTC')}</p>
+   <div class="row" style="flex-wrap:wrap;gap:8px">\${sched.runs.map(r=>'<span class="pill">'+esc(r.replace("T"," ").replace("Z"," UTC"))+'</span>').join('')}</div>
+  </div>\`:'';
  app.innerHTML=\`
   <a class="muted" href="#/channels">← Canales</a>
   <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
@@ -263,7 +273,7 @@ async function viewChannel(id){
    <div class="card kpi"><span class="l">Adapter</span><span class="n" style="font-size:22px">\${esc(d.adapter)}</span></div>
    <div class="card kpi"><span class="l">Vídeo</span><span class="n" style="font-size:22px">\${esc(d.video)} · \${esc(d.style||'-')}</span></div>
   </div>
-  \${editor}\${pendHtml}\${anCard}\${scriptCard}\${versCard}
+  \${editor}\${pendHtml}\${schedCard}\${anCard}\${scriptCard}\${versCard}
   <div class="card" style="margin-bottom:18px">
    <div class="row" style="justify-content:space-between;align-items:center">
     <h3 style="margin:0">Ejecuciones</h3>
@@ -284,6 +294,13 @@ async function viewChannel(id){
   if($('#e_style')&&cfg.video)cfg.video.style=$('#e_style').value;
   if(cfg.approval)cfg.approval.required=$('#e_appr').checked;else cfg.approval={required:$('#e_appr').checked};
   if(cfg.schedule&&cfg.schedule.trigger)cfg.schedule.trigger.at=$('#e_at').value;
+  cfg.render=cfg.render||{};cfg.render.branding=cfg.render.branding||{watermark:{}};
+  cfg.render.branding.watermark=cfg.render.branding.watermark||{};
+  cfg.render.branding.watermark.enabled=$('#e_wm').checked;
+  cfg.render.branding.watermark.path=$('#e_wm_path').value||undefined;
+  cfg.render.branding.watermark.position=$('#e_wm_pos').value;
+  cfg.render.branding.intro=$('#e_intro').value||undefined;
+  cfg.render.branding.outro=$('#e_outro').value||undefined;
   document.querySelectorAll('[data-fmt]').forEach(c=>{cfg.formats[+c.dataset.fmt].enabled=c.checked});
   document.querySelectorAll('[data-plat]').forEach(c=>{cfg.platforms[+c.dataset.plat].enabled=c.checked});
   try{await api('/api/channels/'+encodeURIComponent(id)+'/config',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(cfg)});location.reload()}

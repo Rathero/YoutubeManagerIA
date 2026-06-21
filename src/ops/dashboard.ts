@@ -238,6 +238,15 @@ export function startDashboard(port = 8787): ReturnType<typeof createServer> {
         return send(res, 200, analyticsSummary(await loadMetrics(id)));
       }
 
+      const schedMatch = path.match(/^\/api\/channels\/([^/]+)\/schedule$/);
+      if (schedMatch) {
+        const id = decodeURIComponent(schedMatch[1]!);
+        const def = await loadChannelDefinition(resolve(configDir(), `${id}.yaml`));
+        const { nextRuns } = await import("./schedule.js");
+        const at = def.schedule.trigger.at;
+        return send(res, 200, { at: at ?? null, timezone: def.schedule.timezone, runs: nextRuns(at, new Date(), 6) });
+      }
+
       const pendMatch = path.match(/^\/api\/channels\/([^/]+)\/pending$/);
       if (pendMatch) {
         const id = decodeURIComponent(pendMatch[1]!);

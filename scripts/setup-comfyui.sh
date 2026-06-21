@@ -33,10 +33,14 @@ case "$CHOICE" in
   flux-schnell|flux)
     URL="https://huggingface.co/Comfy-Org/flux1-schnell/resolve/main/flux1-schnell-fp8.safetensors"
     FILE="$CKPT_DIR/flux1-schnell-fp8.safetensors"; MINSZ=15000000000; WF="flux-schnell-image.json";;
+  flux-dev)
+    URL="https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors"
+    FILE="$CKPT_DIR/flux1-dev-fp8.safetensors"; MINSZ=15000000000; WF="flux-dev-image.json"
+    warn "FLUX.1 dev es licencia NO COMERCIAL. Para monetizar usa flux-schnell (Apache).";;
   sdxl)
     URL="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
     FILE="$CKPT_DIR/sd_xl_base_1.0.safetensors"; MINSZ=6000000000; WF="sdxl-image.json";;
-  *) echo "Modelo desconocido: $CHOICE (usa sdxl | flux-schnell | auto)"; exit 1;;
+  *) echo "Modelo desconocido: $CHOICE (usa sdxl | flux-schnell | flux-dev | auto)"; exit 1;;
 esac
 
 [ "${VRAM:-0}" -gt 0 ] && [ "${VRAM:-0}" -lt 8000 ] && warn "VRAM baja (${VRAM}MB): la generación de imagen irá lenta. Considera usar la nube."
@@ -65,3 +69,18 @@ fi
 
 printf "\n\033[1;32m✅ Listo.\033[0m  Usa en tu config:\n"
 printf "   image: { provider: comfyui, workflow: \"comfyui-workflows/%s\" }\n\n" "$WF"
+
+# ── Vídeo local opcional (LTX-Video) ──────────────────────────────────────────────
+if [ "${VIDEO:-}" = "ltx" ] || [ "${2:-}" = "video-ltx" ]; then
+  say "Vídeo local: descargando LTX-Video + encoder T5"
+  mkdir -p "$MODELS_DIR/text_encoders"
+  dl(){ # url dest minsz
+    if [ -f "$2" ] && [ "$(stat -c%s "$2" 2>/dev/null || stat -f%z "$2" 2>/dev/null || echo 0)" -gt "$3" ]; then ok "$(basename "$2") ya está";
+    elif command -v curl >/dev/null 2>&1; then curl -L -C - -o "$2" "$1";
+    else wget -c -O "$2" "$1"; fi; }
+  dl "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.5.safetensors" "$CKPT_DIR/ltx-video-2b-v0.9.5.safetensors" 3000000000
+  dl "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors" "$MODELS_DIR/text_encoders/t5xxl_fp8_e4m3fn.safetensors" 4000000000
+  ok "LTX descargado. Workflow: comfyui-workflows/ltx-video.json"
+  warn "LTX necesita un ComfyUI reciente (nodos LTXV nativos). Si falla, re-exporta tu workflow (Save API Format)."
+  printf "   video: { mode: generative, provider: comfyui, workflow: \"comfyui-workflows/ltx-video.json\" }\n\n"
+fi

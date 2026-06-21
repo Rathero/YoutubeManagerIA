@@ -104,6 +104,11 @@ export function startDashboard(port = 8787): ReturnType<typeof createServer> {
         return res.end(UI_HTML);
       }
       if (path === "/api/health") return send(res, 200, { ok: true, tenant: tenant() || "default" });
+      if (path === "/api/hardware") {
+        const { detectHardware, recommend } = await import("./hardware.js");
+        const hw = await detectHardware();
+        return send(res, 200, { hw, rec: recommend(hw) });
+      }
       if (path === "/api/doctor") {
         const r = await probeLocalServices();
         return send(res, 200, { llm: r.llm.ok, llmModel: r.llmModel, tts: r.tts.ok, comfyui: r.comfyui.ok, ffmpeg: r.ffmpeg.ok });

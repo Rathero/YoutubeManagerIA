@@ -19,6 +19,7 @@ if($Model -eq "auto"){ if($vram -ge 12000){$Model="flux-schnell"}else{$Model="sd
 switch($Model){
  "flux-schnell" { $Url="https://huggingface.co/Comfy-Org/flux1-schnell/resolve/main/flux1-schnell-fp8.safetensors"; $File=Join-Path $CkptDir "flux1-schnell-fp8.safetensors"; $Min=15000000000; $Wf="flux-schnell-image.json" }
  "flux"         { $Url="https://huggingface.co/Comfy-Org/flux1-schnell/resolve/main/flux1-schnell-fp8.safetensors"; $File=Join-Path $CkptDir "flux1-schnell-fp8.safetensors"; $Min=15000000000; $Wf="flux-schnell-image.json" }
+ "flux-dev"     { $Url="https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors"; $File=Join-Path $CkptDir "flux1-dev-fp8.safetensors"; $Min=15000000000; $Wf="flux-dev-image.json"; Warn "FLUX.1 dev = NO COMERCIAL. Para monetizar usa flux-schnell." }
  default        { $Url="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"; $File=Join-Path $CkptDir "sd_xl_base_1.0.safetensors"; $Min=6000000000; $Wf="sdxl-image.json" }
 }
 if($vram -gt 0 -and $vram -lt 8000){ Warn "VRAM baja (${vram}MB): imagen lenta. Considera la nube." }

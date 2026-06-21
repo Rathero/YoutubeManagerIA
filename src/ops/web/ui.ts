@@ -96,9 +96,10 @@ function setActive(r){document.querySelectorAll('#nav a').forEach(a=>a.classList
 
 async function viewHome(){
  setActive('/');
- let ch=[],doc={};
+ let ch=[],doc={},hwr={};
  try{ch=await api('/api/channels')}catch{}
  try{doc=await api('/api/doctor')}catch{}
+ try{hwr=await api('/api/hardware')}catch{}
  const cost=ch.reduce((s,c)=>s+(c.cost||0),0);
  const chip=(ok,l)=>'<span class="chip '+(ok?'ok':'bad')+'"><span class="dot"></span>'+l+'</span>';
  app.innerHTML=\`
@@ -121,6 +122,24 @@ async function viewHome(){
     \${chip(doc.ffmpeg,'ffmpeg '+(doc.ffmpeg?'ok':'falta'))}
    </div>
    <p class="hint">¿Sin servidores? Ejecuta <code>npm run setup:local</code>. El pipeline corre igual en modo demo.</p>
+  </div>
+  \${hwr.hw?hwCard(hwr):''}\`;
+}
+function hwCard(h){
+ const hw=h.hw,r=h.rec;
+ const gpu=hw.gpu?(hw.gpu.name+' · '+Math.round(hw.gpu.vramMB/1024)+'GB VRAM'):(hw.appleSilicon?'Apple Silicon (Metal)':'sin GPU NVIDIA');
+ const tag=(ok,txt)=>'<span class="chip '+(ok?'ok':'warn')+'"><span class=dot></span>'+txt+'</span>';
+ const llm={'small':'LLM 3-4B','medium':'LLM 8-14B','large':'LLM 70B','cloud-only':'LLM solo nube'}[r.localLLM];
+ return \`<div class="card" style="margin-top:16px">
+   <div class="row" style="justify-content:space-between;align-items:center"><h3>Tu equipo</h3><span class="muted">\${hw.ramGB}GB RAM · \${hw.cpus} CPU · \${esc(gpu)}</span></div>
+   <p class="muted" style="margin:6px 0 10px">Lo que puedes correr en local ($0):</p>
+   <div class="row">
+    \${tag(r.localLLM!=='cloud-only',llm)}
+    \${tag(r.image!=='cloud-only',r.image==='cloud-only'?'Imagen: nube':'Imagen: '+r.image)}
+    \${tag(r.video==='local-ok',r.video==='local-ok'?'Vídeo local OK':'Vídeo: nube')}
+    \${tag(true,'Voz: Kokoro (CPU)')}
+   </div>
+   <p class="hint" style="margin-top:10px">\${esc((r.notes&&r.notes[0])||'')} · Detalle en HARDWARE.md</p>
   </div>\`;
 }
 

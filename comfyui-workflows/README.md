@@ -24,8 +24,12 @@ lo deja en `comfyui-models/` (bind-montado en el contenedor) y te indica qué wo
 
 - **`flux-schnell-image.json`** — FLUX.1 schnell (fp8, single-file). La mejor calidad open,
   licencia Apache (uso comercial), 4 pasos. Checkpoint: `flux1-schnell-fp8.safetensors`.
+- **`flux-dev-image.json`** — FLUX.1 dev (fp8). Mejor detalle aún, pero licencia **NO comercial**.
+  `npm run setup:comfyui -- flux-dev`.
 - **`sdxl-image.json`** — Stable Diffusion XL text→image. Checkpoint: `sd_xl_base_1.0.safetensors`.
   Más ligero (8 GB VRAM).
+- **`ltx-video.json`** — LTX-Video text→video (best-effort). `npm run setup:comfyui -- <modelo> video-ltx`
+  baja el checkpoint + encoder T5. Requiere un ComfyUI reciente con nodos LTXV; re-exporta si falla.
 - **`wan-video.json`** — placeholder for a local **text→video** model (Wan 2.2 / LTX-Video /
   HunyuanVideo). **Replace it with your own**: build the graph in ComfyUI, then
   *Save (API Format)*, and add the tokens above where prompt/size/length go. The final

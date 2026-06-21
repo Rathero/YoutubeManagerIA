@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getAdapter } from "../adapters/registry.js";
 import { Orchestrator, type RunOutcome } from "../core/orchestrator/orchestrator.js";
-import type { ChannelDefinition, RunContext } from "../core/types/index.js";
+import type { ChannelDefinition, ContentPayload, FormatScript, RunContext } from "../core/types/index.js";
 import { createLogger } from "../ops/logger.js";
 import { notifyRunOutcome } from "../ops/notify.js";
 import { toRunRecord, type Store } from "../storage/store.js";
@@ -26,6 +26,11 @@ export interface RunOptions {
   now?: Date;
   dryRun?: boolean;
   store?: Store;
+  /**
+   * Partial re-render: skip ingest/compute/script and start from a given payload +
+   * (edited) scripts — used by the "edit script & re-render" flow in the UI.
+   */
+  inject?: { payload: ContentPayload; scripts: FormatScript[] };
 }
 
 function isoToday(now: Date): string {
@@ -54,10 +59,8 @@ export async function runChannel(channel: ChannelDefinition, opts: RunOptions = 
     llm,
   };
 
-  const orchestrator = new Orchestrator([
-    createIngestStage(adapter),
-    createComputeStage(adapter),
-    createScriptStage(llm),
+  // Stages after the script step — shared by full and partial (re-render) runs.
+  const tail = [
     createModerationStage(),
     createVoiceStage(),
     createCaptionsStage(),
@@ -67,7 +70,17 @@ export async function runChannel(channel: ChannelDefinition, opts: RunOptions = 
     createQaStage(),
     createPublishStage(store),
     createRecordStage(store),
-  ]);
+  ];
+
+  let stages;
+  if (opts.inject) {
+    ctx.payload = opts.inject.payload;
+    ctx.scripts = opts.inject.scripts;
+    stages = tail; // skip ingest/compute/script
+  } else {
+    stages = [createIngestStage(adapter), createComputeStage(adapter), createScriptStage(llm), ...tail];
+  }
+  const orchestrator = new Orchestrator(stages);
 
   const outcome = await orchestrator.run(ctx);
 

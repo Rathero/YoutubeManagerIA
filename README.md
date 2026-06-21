@@ -328,6 +328,14 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
   publicación desde la web (valida con el schema y guarda la config). `/api/channels/:id/config`.
 - **Versiones:** cada run guarda su titular/estilo/voz; la ficha del canal lista las versiones
   y permite **Regenerar (otro ángulo)** en un clic. Guion del último ciclo visible en la UI.
+- **Edición de guion + re-render parcial:** edita el guion en la UI y **re-renderiza solo**
+  voz→render→… sin recalcular datos (`runChannel({ inject })`, `PUT /api/channels/:id/scripts`).
+- **Archivado de versiones + promover:** cada ciclo archiva su media en `versions/<runId>/`;
+  desde la UI puedes **promover** una versión anterior como la actual (`/versions`, `/promote`).
+- **Dedup semántico:** con `FACTORY_EMBED=1` el QA compara titulares por **embeddings**
+  (coseno), con fallback a Jaccard.
+- **Editor visual de formatos/plataformas:** activa/desactiva formatos y plataformas desde la UI.
+- **i18n de la interfaz:** selector ES/EN en la web.
 
 ## Crecimiento, ingresos y operación
 

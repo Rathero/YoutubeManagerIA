@@ -46,7 +46,10 @@ export function createQaStage(): Stage {
           if (isDuplicateHeadline(payload.headlineFact, recent)) {
             warnings.push(`headline repite uno reciente: "${payload.headlineFact}" — varía el ángulo`);
           } else {
-            const near = nearDuplicate(payload.headlineFact, recent);
+            // Semantic dedup when enabled (embeddings), else lexical (Jaccard).
+            const { embeddingsEnabled, semanticNearDuplicate } = await import("../../storage/embeddings.js");
+            let near = embeddingsEnabled() ? await semanticNearDuplicate(payload.headlineFact, recent) : null;
+            if (!near) near = nearDuplicate(payload.headlineFact, recent);
             if (near) warnings.push(`headline muy similar (${near.score}) a "${near.match}" — varía el ángulo`);
           }
         } catch {

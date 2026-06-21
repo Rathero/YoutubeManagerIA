@@ -76,20 +76,26 @@ label{display:block;font-weight:700;margin:14px 0 6px;font-size:13px}
  <aside class="side">
   <div class="brand"><div class="logo">🏭</div><div><b>Channel Factory</b><small id="tenant">workspace</small></div></div>
   <nav class="nav" id="nav">
-   <a href="#/" data-r="/"><span class="ic">🏠</span> Inicio</a>
-   <a href="#/create" data-r="/create"><span class="ic">✨</span> Crear canal</a>
-   <a href="#/channels" data-r="/channels"><span class="ic">📺</span> Canales</a>
-   <a href="#/library" data-r="/library"><span class="ic">📚</span> Biblioteca</a>
-   <a href="#/calendar" data-r="/calendar"><span class="ic">🗓️</span> Calendario</a>
-   <a href="#/setup" data-r="/setup"><span class="ic">🩺</span> Estado local</a>
+   <a href="#/" data-r="/"><span class="ic">🏠</span> <span data-t="home">Inicio</span></a>
+   <a href="#/create" data-r="/create"><span class="ic">✨</span> <span data-t="create">Crear canal</span></a>
+   <a href="#/channels" data-r="/channels"><span class="ic">📺</span> <span data-t="channels">Canales</span></a>
+   <a href="#/library" data-r="/library"><span class="ic">📚</span> <span data-t="library">Biblioteca</span></a>
+   <a href="#/calendar" data-r="/calendar"><span class="ic">🗓️</span> <span data-t="calendar">Calendario</span></a>
+   <a href="#/setup" data-r="/setup"><span class="ic">🩺</span> <span data-t="setup">Estado local</span></a>
   </nav>
-  <div class="foot">Sin código · Cloud o local ($0)<br/>v0.1 · 2026</div>
+  <div class="foot"><select id="lang" style="width:100%;margin-bottom:8px"><option value="es">Español</option><option value="en">English</option></select>Sin código · Cloud o local ($0)<br/>v0.1 · 2026</div>
  </aside>
  <main class="main" id="app"><div class="spin"></div></main>
 </div>
 <script>
 const $=(s,e=document)=>e.querySelector(s);
 const app=$('#app');
+// Lightweight i18n for the navigation/shell.
+const LANG=localStorage.getItem('cf_lang')||'es';
+const I18N={es:{home:'Inicio',create:'Crear canal',channels:'Canales',library:'Biblioteca',calendar:'Calendario',setup:'Estado local'},
+ en:{home:'Home',create:'Create channel',channels:'Channels',library:'Library',calendar:'Calendar',setup:'Local status'}};
+const t=k=>(I18N[LANG]||I18N.es)[k]||k;
+function applyI18n(){document.querySelectorAll('[data-t]').forEach(el=>{el.textContent=t(el.dataset.t)});const s=$('#lang');if(s){s.value=LANG;s.onchange=()=>{localStorage.setItem('cf_lang',s.value);location.reload()}}}
 // Token (for protected/public dashboards): open with ?token=XYZ once; it's remembered.
 const TOKEN=new URLSearchParams(location.search).get('token')||localStorage.getItem('cf_token')||'';
 if(TOKEN)localStorage.setItem('cf_token',TOKEN);
@@ -190,14 +196,19 @@ async function viewChannel(id){
     \${cfg.video?'<div class="item"><div class="l">Estilo</div><select id="e_style">'+styleOpts.map(v=>opt(v,cfg.video.style)).join('')+'</select></div>':''}
     <div class="item"><div class="l">Aprobación humana</div><label class="toggle"><input type="checkbox" id="e_appr" \${cfg.approval&&cfg.approval.required?'checked':''}/> <span>requerida</span></label></div>
     <div class="item"><div class="l">Hora publicación (cron)</div><input id="e_at" value="\${esc((cfg.schedule&&cfg.schedule.trigger&&cfg.schedule.trigger.at)||'')}"/></div>
+    <div class="item" style="grid-column:1/3"><div class="l">Formatos activos</div>\${cfg.formats.map((f,i)=>'<label class="toggle" style="display:inline-flex;margin:4px 8px 0 0;width:auto"><input type="checkbox" data-fmt="'+i+'" '+(f.enabled?'checked':'')+'/> <span>'+esc(f.kind)+'</span></label>').join('')}</div>
+    <div class="item" style="grid-column:1/3"><div class="l">Plataformas activas</div>\${cfg.platforms.map((p,i)=>'<label class="toggle" style="display:inline-flex;margin:4px 8px 0 0;width:auto"><input type="checkbox" data-plat="'+i+'" '+(p.enabled?'checked':'')+'/> <span>'+esc(p.id)+'</span></label>').join('')}</div>
    </div>
    <div style="margin-top:14px"><button class="btn primary" id="savecfg">Guardar</button> <button class="btn ghost" id="canceledit">Cancelar</button></div>
   </div>\`:'';
- const scriptCard=last&&last.payload?\`<div class="card" style="margin-bottom:18px">
-   <h3>Guion del último ciclo (\${esc(last.date||'')})</h3>
+ let versions=[];if(last&&last.date){try{versions=await api('/api/channels/'+encodeURIComponent(id)+'/versions?date='+encodeURIComponent(last.date))}catch{}}
+ const scriptCard=last&&last.payload&&(last.scripts||[]).length?\`<div class="card" style="margin-bottom:18px">
+   <h3>Guion del último ciclo (\${esc(last.date||'')}) — editable</h3>
    <p style="font-weight:700">\${esc(last.payload.headlineFact||'')}</p>
-   \${(last.scripts||[]).map(s=>'<div class="item" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:8px"><div class="l">'+esc(s.format)+' · '+s.wordCount+' palabras</div><div style="margin-top:4px;white-space:pre-wrap">'+esc((s.narration||'').slice(0,600))+'</div></div>').join('')||'<p class="muted">Sin guion guardado todavía.</p>'}
+   \${(last.scripts||[]).map(s=>'<label>'+esc(s.format)+'</label><textarea data-sf="'+esc(s.format)+'">'+esc(s.narration||'')+'</textarea>').join('')}
+   <div style="margin-top:12px"><button class="btn primary" id="saveScript">Guardar y re-renderizar (preview)</button></div>
   </div>\`:'';
+ const versCard=versions.length?\`<div class="card" style="margin-bottom:18px"><h3>Versiones de \${esc(last.date)}</h3>\${versions.map(v=>'<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px"><span>'+esc((v.headline||'').slice(0,50))+' <span class=pill>'+esc(v.style||'-')+'</span> · '+v.files.length+' archivo(s)</span><button class="btn ghost" data-promote="'+esc(v.runId)+'">Promover</button></div>').join('')}</div>\`:'';
  app.innerHTML=\`
   <a class="muted" href="#/channels">← Canales</a>
   <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
@@ -210,10 +221,10 @@ async function viewChannel(id){
    <div class="card kpi"><span class="l">Adapter</span><span class="n" style="font-size:22px">\${esc(d.adapter)}</span></div>
    <div class="card kpi"><span class="l">Vídeo</span><span class="n" style="font-size:22px">\${esc(d.video)} · \${esc(d.style||'-')}</span></div>
   </div>
-  \${editor}\${pendHtml}\${scriptCard}
+  \${editor}\${pendHtml}\${scriptCard}\${versCard}
   <div class="card" style="margin-bottom:18px">
    <div class="row" style="justify-content:space-between;align-items:center">
-    <h3 style="margin:0">Versiones / ejecuciones</h3>
+    <h3 style="margin:0">Ejecuciones</h3>
     <span><button class="btn ghost" id="regenbtn">🎲 Regenerar (otro ángulo)</button> <button class="btn" id="runbtn">▶ Probar (dry-run)</button></span>
    </div>
    <table style="margin-top:10px"><thead><tr><th>Fecha</th><th>Estado</th><th>Titular / estilo</th><th>Salidas</th></tr></thead><tbody>
@@ -228,8 +239,16 @@ async function viewChannel(id){
   if($('#e_style')&&cfg.video)cfg.video.style=$('#e_style').value;
   if(cfg.approval)cfg.approval.required=$('#e_appr').checked;else cfg.approval={required:$('#e_appr').checked};
   if(cfg.schedule&&cfg.schedule.trigger)cfg.schedule.trigger.at=$('#e_at').value;
+  document.querySelectorAll('[data-fmt]').forEach(c=>{cfg.formats[+c.dataset.fmt].enabled=c.checked});
+  document.querySelectorAll('[data-plat]').forEach(c=>{cfg.platforms[+c.dataset.plat].enabled=c.checked});
   try{await api('/api/channels/'+encodeURIComponent(id)+'/config',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(cfg)});location.reload()}
   catch(e){alert('Error al guardar: '+e.message);ev.target.disabled=false}};
+ if($('#saveScript'))$('#saveScript').onclick=async ev=>{ev.target.disabled=true;ev.target.innerHTML='<span class="spin"></span>…';
+  const scripts=[...document.querySelectorAll('[data-sf]')].map(t=>({format:t.dataset.sf,narration:t.value}));
+  try{const o=await api('/api/channels/'+encodeURIComponent(id)+'/scripts',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({date:last.date,scripts})});alert('Re-renderizado: '+o.status);location.reload()}
+  catch(e){alert('Error: '+e.message);ev.target.disabled=false;ev.target.textContent='Guardar y re-renderizar (preview)'}};
+ document.querySelectorAll('[data-promote]').forEach(b=>b.onclick=async()=>{b.disabled=true;
+  try{await api('/api/channels/'+encodeURIComponent(id)+'/promote',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date:last.date,runId:b.dataset.promote})});alert('Versión promovida ✓')}catch(e){alert('Error: '+e.message);b.disabled=false}});
  $('#regenbtn').onclick=async ev=>{const date=(last&&last.date)||(runs[0]&&runs[0].date);if(!date){alert('Ejecuta primero un ciclo');return}
   ev.target.disabled=true;ev.target.innerHTML='<span class="spin"></span>…';
   try{const o=await api('/api/channels/'+encodeURIComponent(id)+'/regenerate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({date,reroll:true})});alert('Regenerado: '+(o.headline||o.status));location.reload()}
@@ -367,6 +386,7 @@ function router(){
 }
 window.addEventListener('hashchange',router);
 api('/api/health').then(h=>{if(h.tenant)$('#tenant').textContent=h.tenant}).catch(()=>{});
+applyI18n();
 router();
 </script>
 </body>

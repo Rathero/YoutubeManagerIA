@@ -19,6 +19,14 @@ export function createRecordStage(store: Store): Stage {
         await writeFile(join(dir, `${ctx.channel.id}_${ctx.date}.json`), JSON.stringify(ctx.scripts, null, 2));
       }
       await store.saveRun(toRunRecord(ctx, "completed"));
+      // Archive this run's media as a promotable version.
+      if (ctx.rendered?.length) {
+        const { archiveVersion } = await import("../../storage/versions.js");
+        await archiveVersion(ctx.channel.id, ctx.date, ctx.runId, ctx.rendered, ctx.thumbnails ?? [], {
+          headline: ctx.payload?.headlineFact,
+          style: ctx.channel.video?.style,
+        }).catch((e) => ctx.log("warn", "version archive failed", { error: (e as Error).message }));
+      }
       ctx.log("info", "run recorded", { runId: ctx.runId });
     },
   };

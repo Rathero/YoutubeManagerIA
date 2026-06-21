@@ -178,6 +178,38 @@ export function startDashboard(port = 8787): ReturnType<typeof createServer> {
         return send(res, 200, { date, payload, scripts });
       }
 
+      const scriptsMatch = path.match(/^\/api\/channels\/([^/]+)\/scripts$/);
+      if (scriptsMatch && req.method === "PUT") {
+        const id = decodeURIComponent(scriptsMatch[1]!);
+        const b = await readBody(req);
+        if (!b.date || !Array.isArray(b.scripts)) return send(res, 400, { error: "date + scripts required" });
+        const { readFile } = await import("node:fs/promises");
+        const payload = JSON.parse(await readFile(join(dbDir(), "payloads", `${id}_${b.date}.json`), "utf8"));
+        const def = await loadChannelDefinition(resolve(configDir(), `${id}.yaml`));
+        const scripts = b.scripts.map((s: any) => ({
+          format: s.format,
+          sections: { edited: String(s.narration ?? "") },
+          narration: String(s.narration ?? ""),
+          wordCount: String(s.narration ?? "").split(/\s+/).filter(Boolean).length,
+        }));
+        const outcome = await runChannel(def, { date: b.date, dryRun: b.publish !== true, inject: { payload, scripts } });
+        return send(res, 200, { status: outcome.status });
+      }
+
+      const versionsMatch = path.match(/^\/api\/channels\/([^/]+)\/versions$/);
+      if (versionsMatch) {
+        const id = decodeURIComponent(versionsMatch[1]!);
+        const { listVersions } = await import("../storage/versions.js");
+        return send(res, 200, await listVersions(id, url.searchParams.get("date") ?? ""));
+      }
+      const promoteMatch = path.match(/^\/api\/channels\/([^/]+)\/promote$/);
+      if (promoteMatch && req.method === "POST") {
+        const id = decodeURIComponent(promoteMatch[1]!);
+        const b = await readBody(req);
+        const { promoteVersion } = await import("../storage/versions.js");
+        return send(res, 200, { ok: await promoteVersion(id, b.date, b.runId) });
+      }
+
       const regenMatch = path.match(/^\/api\/channels\/([^/]+)\/regenerate$/);
       if (regenMatch && req.method === "POST") {
         const id = decodeURIComponent(regenMatch[1]!);

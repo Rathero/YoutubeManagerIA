@@ -237,7 +237,7 @@ async function viewChannel(id){
     <span><button class="btn ghost" id="regenbtn">🎲 Regenerar (otro ángulo)</button> <button class="btn" id="runbtn">▶ Probar (dry-run)</button></span>
    </div>
    <table style="margin-top:10px"><thead><tr><th>Fecha</th><th>Estado</th><th>Titular / estilo</th><th>Salidas</th></tr></thead><tbody>
-    \${runs.length?runs.map(r=>'<tr><td>'+esc(r.date)+'</td><td><span class="chip '+cls(r.status)+'"><span class=dot></span>'+esc(r.status)+'</span></td><td>'+esc(((r.meta&&r.meta.headline)||'').slice(0,48))+(r.meta&&r.meta.style?' <span class=pill>'+esc(r.meta.style)+'</span>':'')+'</td><td>'+(r.publications||[]).length+'</td></tr>').join(''):'<tr><td colspan=4 class=muted>Sin ejecuciones aún</td></tr>'}
+    \${runs.length?runs.map(r=>'<tr><td>'+esc(r.date)+'</td><td><span class="chip '+cls(r.status)+'"><span class=dot></span>'+esc(r.status)+'</span></td><td>'+esc(((r.meta&&r.meta.headline)||'').slice(0,48))+(r.meta&&r.meta.style?' <span class=pill>'+esc(r.meta.style)+'</span>':'')+(r.meta&&r.meta.quality?' <span class="chip '+(r.meta.quality>=70?'ok':r.meta.quality>=45?'warn':'bad')+'">Q'+r.meta.quality+'</span>':'')+'</td><td>'+(r.publications||[]).length+'</td></tr>').join(''):'<tr><td colspan=4 class=muted>Sin ejecuciones aún</td></tr>'}
    </tbody></table>
   </div>
   <div class="card"><h3>Experimentos sugeridos</h3>\${exp||'<p class="muted">Recopila métricas para ver recomendaciones.</p>'}</div>\`;

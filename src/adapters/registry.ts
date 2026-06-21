@@ -2,6 +2,7 @@ import type { AdapterFactory, NicheAdapter } from "./_interface.js";
 import { createLuzAdapter } from "./luz/index.js";
 import { createGenerativeAdapter } from "./generative/index.js";
 import { createHttpAdapter } from "./http/index.js";
+import { createRssAdapter } from "./rss/index.js";
 
 /**
  * Adapter registry: maps ChannelDefinition.data.adapter -> factory.
@@ -16,6 +17,7 @@ const registry = new Map<string, AdapterFactory>([
   ["generative", createGenerativeAdapter],
   ["generic", createGenerativeAdapter], // back-compat alias
   ["http", createHttpAdapter],
+  ["rss", createRssAdapter],
 ]);
 
 export function registerAdapter(key: string, factory: AdapterFactory): void {

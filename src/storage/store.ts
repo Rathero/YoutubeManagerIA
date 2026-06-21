@@ -23,7 +23,7 @@ export interface RunRecord {
   publications: PublishResult[];
   createdAt: string;
   /** Version metadata — distinguishes regenerations of the same date. */
-  meta?: { headline?: string; style?: string; voice?: string };
+  meta?: { headline?: string; style?: string; voice?: string; quality?: number };
 }
 
 export interface Store {
@@ -136,6 +136,7 @@ export function toRunRecord(
       headline: ctx.payload?.headlineFact,
       style: ctx.channel.video?.style,
       voice: ctx.channel.voice.provider,
+      quality: ctx.qualityScore,
     },
   };
 }

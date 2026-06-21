@@ -118,6 +118,14 @@ export function createQaStage(): Stage {
         warnings.push(`B-roll from ${ctx.channel.render.broll.provider} (royalty-free) — keep attribution where required`);
       }
 
+      // Content quality score (informational; warns when thin).
+      if (payload) {
+        const { qualityScore } = await import("./quality.js");
+        const q = qualityScore(payload);
+        ctx.qualityScore = q.score;
+        if (q.score < 45) warnings.push(`calidad baja (${q.score}/100): ${q.factors.slice(0, 2).join("; ")}`);
+      }
+
       const passed = failures.length === 0;
       ctx.qa = { passed, failures, warnings };
       ctx.log(passed ? "info" : "error", `qa ${passed ? "passed" : "failed"}`, {

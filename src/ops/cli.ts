@@ -394,6 +394,73 @@ program
   });
 
 program
+  .command("optimize")
+  .description("Apply the feedback loop to the config (auto-tune publish times)")
+  .argument("<channel>", "channel id")
+  .option("-m, --metrics <file>", "metrics JSON (defaults to out/_db/metrics/<id>.json)")
+  .option("--apply", "save the changes (otherwise just preview)", false)
+  .action(async (channel: string, opts: { metrics?: string; apply?: boolean }) => {
+    const def = await loadChannelDefinition(resolveConfig(channel));
+    const path = opts.metrics ? resolve(process.cwd(), opts.metrics) : join(dbDir(), "metrics", `${channel}.json`);
+    let metrics: any[] = [];
+    try { metrics = JSON.parse(await readFile(path, "utf8")); } catch { /* none */ }
+    const { optimizeChannel } = await import("../analytics/optimize.js");
+    const { channel: next, changes } = optimizeChannel(def, metrics);
+    if (changes.length === 0) return console.log("Sin cambios recomendados (faltan datos o ya está óptimo).");
+    console.log(`\nCambios para ${channel}:`);
+    for (const c of changes) console.log(`  • ${c}`);
+    if (opts.apply) {
+      const { saveChannelDefinition } = await import("../config/loader.js");
+      await saveChannelDefinition(next);
+      console.log("\n✅ Aplicado y guardado.");
+    } else {
+      console.log("\n(Previsualización — usa --apply para guardar.)");
+    }
+  });
+
+program
+  .command("clone")
+  .description("Duplicate a channel config as a template (new id, status draft)")
+  .argument("<source>", "source channel id or path")
+  .argument("<newId>", "new channel id")
+  .action(async (source: string, newId: string) => {
+    const def = JSON.parse(JSON.stringify(await loadChannelDefinition(resolveConfig(source))));
+    def.id = newId;
+    def.status = "draft";
+    for (const p of def.platforms) p.account_ref = p.account_ref.replace(/[^/]+$/, newId);
+    const { saveChannelDefinition } = await import("../config/loader.js");
+    await saveChannelDefinition(def);
+    console.log(`Clonado ${source} → ${newId} (status: draft).`);
+  });
+
+program
+  .command("export")
+  .description("Export a channel config (recipe) to YAML")
+  .argument("<channel>", "channel id")
+  .option("-o, --out <file>", "write to file instead of stdout")
+  .action(async (channel: string, opts: { out?: string }) => {
+    const def = await loadChannelDefinition(resolveConfig(channel));
+    const yaml = toYaml(def);
+    if (opts.out) {
+      await writeFile(resolve(process.cwd(), opts.out), yaml);
+      console.log(`Exportado a ${opts.out}`);
+    } else {
+      process.stdout.write(yaml);
+    }
+  });
+
+program
+  .command("import")
+  .description("Import a channel config (recipe) from a YAML/JSON file")
+  .argument("<file>", "path to the config file")
+  .action(async (file: string) => {
+    const { loadChannelDefinition: load, saveChannelDefinition } = await import("../config/loader.js");
+    const def = await load(resolve(process.cwd(), file));
+    await saveChannelDefinition(def);
+    console.log(`Importado: ${def.id}`);
+  });
+
+program
   .command("metrics:pull")
   .description("Pull real YouTube stats into the metrics file (needs FACTORY_YT_API_KEY)")
   .argument("<channel>", "channel id")

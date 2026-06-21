@@ -111,6 +111,8 @@ export interface RunContext {
   thumbnails?: ThumbnailAsset[];
   metadata?: PlatformMeta[];
   qa?: { passed: boolean; failures: string[]; warnings: string[] };
+  /** Content quality score 0..100 (set by the QA stage). */
+  qualityScore?: number;
   moderation?: { flagged: boolean; reasons: string[] };
   publications?: PublishResult[];
 

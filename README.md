@@ -62,6 +62,7 @@ contrato sigue abierto para casos a medida (`src/adapters/_interface.ts`):
 |---------|----------|--------|
 | **`generative`** | cualquier tema sin fuente de datos (historia, curiosidades, motivación…) | el LLM crea el contenido del día desde `niche.topic`; rota ángulos por fecha |
 | **`http`** | nichos de datos con un feed JSON | `url` + `y_field` + mapeo; calcula min/max/media y construye el payload |
+| **`rss`** | nichos de noticias/blog | `url` de un feed RSS/Atom → resumen diario de titulares (sin código) |
 | **`luz`** (código) | ejemplo trabajado (PVPC) | adapter TypeScript a medida |
 
 **El LLM redacta, no inventa** en nichos de datos (las cifras salen de `analyze()`
@@ -342,6 +343,12 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
   (`FACTORY_YT_API_KEY`) y alimenta el feedback/experimentos.
 - **A/B de miniaturas:** `ab_testing.thumbnails` rota 2 maquetaciones por día; el feedback
   atribuye la ganadora (`thumbnail`).
+- **Auto-optimización (cierra el loop):** `factory optimize <canal> [--apply]` aplica el feedback
+  a la config (ajusta el horario al mejor por datos).
+- **Puntuación de calidad:** cada pieza recibe un score 0-100 (gancho, datos, recomendación,
+  fuente…); avisa si es baja y se muestra en la UI.
+- **Plantillas de canal:** `factory clone <src> <id>`, `export`/`import` para compartir "recetas".
+- **Adapter RSS:** nichos de noticias con solo una URL de feed.
 
 ## Crecimiento, ingresos y operación
 

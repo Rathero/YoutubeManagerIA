@@ -1,3 +1,5 @@
+import { resilientFetch } from "../../core/util/fetch.js";
+
 /**
  * Swappable text/LLM clients. The engine never imports a vendor SDK directly; it asks
  * for an LlmClient and gets whatever the channel configured (anthropic | openai | gemini),
@@ -22,7 +24,7 @@ class AnthropicClient implements LlmClient {
     private readonly model = process.env.FACTORY_ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
   ) {}
   async complete(input: { system: string; user: string; maxTokens?: number }): Promise<string> {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await resilientFetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": this.apiKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
@@ -47,7 +49,7 @@ class OpenAIClient implements LlmClient {
     private readonly base = process.env.FACTORY_OPENAI_BASE ?? "https://api.openai.com/v1",
   ) {}
   async complete(input: { system: string; user: string; maxTokens?: number }): Promise<string> {
-    const res = await fetch(`${this.base}/chat/completions`, {
+    const res = await resilientFetch(`${this.base}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
       body: JSON.stringify({
@@ -74,7 +76,7 @@ class GeminiClient implements LlmClient {
     private readonly base = process.env.FACTORY_GEMINI_BASE ?? "https://generativelanguage.googleapis.com/v1beta",
   ) {}
   async complete(input: { system: string; user: string; maxTokens?: number }): Promise<string> {
-    const res = await fetch(`${this.base}/models/${this.model}:generateContent`, {
+    const res = await resilientFetch(`${this.base}/models/${this.model}:generateContent`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
       body: JSON.stringify({
@@ -101,7 +103,7 @@ class LocalLlmClient implements LlmClient {
     private readonly base = process.env.FACTORY_LOCAL_LLM_URL ?? "http://localhost:11434/v1",
   ) {}
   async complete(input: { system: string; user: string; maxTokens?: number }): Promise<string> {
-    const res = await fetch(`${this.base}/chat/completions`, {
+    const res = await resilientFetch(`${this.base}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer local" },
       body: JSON.stringify({

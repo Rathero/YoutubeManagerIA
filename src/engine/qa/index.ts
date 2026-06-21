@@ -41,10 +41,13 @@ export function createQaStage(): Stage {
       // Dedup: warn if today's headline repeats a recent one (avoids slop/repetition).
       if (payload?.headlineFact) {
         try {
-          const { recentHeadlines, isDuplicateHeadline } = await import("../../storage/dedup.js");
+          const { recentHeadlines, isDuplicateHeadline, nearDuplicate } = await import("../../storage/dedup.js");
           const recent = await recentHeadlines(ctx.channel.id, ctx.date);
           if (isDuplicateHeadline(payload.headlineFact, recent)) {
             warnings.push(`headline repite uno reciente: "${payload.headlineFact}" — varía el ángulo`);
+          } else {
+            const near = nearDuplicate(payload.headlineFact, recent);
+            if (near) warnings.push(`headline muy similar (${near.score}) a "${near.match}" — varía el ángulo`);
           }
         } catch {
           /* dedup best-effort */

@@ -34,3 +34,26 @@ export function isDuplicateHeadline(headline: string, recent: string[]): boolean
   const h = norm(headline);
   return recent.some((r) => norm(r) === h);
 }
+
+function tokens(s: string): Set<string> {
+  return new Set(norm(s).split(" ").filter((w) => w.length > 2));
+}
+
+/** Jaccard similarity of word sets (0..1). */
+export function jaccard(a: string, b: string): number {
+  const ta = tokens(a), tb = tokens(b);
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  return inter / (ta.size + tb.size - inter);
+}
+
+/** Find a recent headline that is near-duplicate (>= threshold), or null. */
+export function nearDuplicate(headline: string, recent: string[], threshold = 0.7): { match: string; score: number } | null {
+  let best: { match: string; score: number } | null = null;
+  for (const r of recent) {
+    const score = jaccard(headline, r);
+    if (score >= threshold && (!best || score > best.score)) best = { match: r, score: Math.round(score * 100) / 100 };
+  }
+  return best;
+}

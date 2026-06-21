@@ -79,6 +79,8 @@ label{display:block;font-weight:700;margin:14px 0 6px;font-size:13px}
    <a href="#/" data-r="/"><span class="ic">🏠</span> Inicio</a>
    <a href="#/create" data-r="/create"><span class="ic">✨</span> Crear canal</a>
    <a href="#/channels" data-r="/channels"><span class="ic">📺</span> Canales</a>
+   <a href="#/library" data-r="/library"><span class="ic">📚</span> Biblioteca</a>
+   <a href="#/calendar" data-r="/calendar"><span class="ic">🗓️</span> Calendario</a>
    <a href="#/setup" data-r="/setup"><span class="ic">🩺</span> Estado local</a>
   </nav>
   <div class="foot">Sin código · Cloud o local ($0)<br/>v0.1 · 2026</div>
@@ -290,12 +292,41 @@ async function viewSetup(){
   </div>\`;
 }
 
+async function viewLibrary(){
+ setActive('/library');
+ app.innerHTML='<div class="h1">Biblioteca</div><p class="sub">Busca en todo el contenido generado.</p>'+
+  '<div class="card"><input id="q" placeholder="Buscar por titular, canal o fecha…"/><div id="res" style="margin-top:12px"></div></div>';
+ const run=async()=>{
+  const rows=await api('/api/library?q='+encodeURIComponent($('#q').value||''));
+  $('#res').innerHTML='<table><thead><tr><th>Fecha</th><th>Canal</th><th>Titular</th><th></th></tr></thead><tbody>'+
+   (rows.length?rows.map(r=>'<tr><td>'+esc(r.date)+'</td><td class=muted>'+esc(r.channelId)+'</td><td>'+esc(r.headline)+'</td><td>'+(r.classification?'<span class=pill>'+esc(r.classification)+'</span>':'')+'</td></tr>').join(''):'<tr><td colspan=4 class=muted>Sin resultados</td></tr>')+'</tbody></table>';
+ };
+ let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(run,250)};
+ run();
+}
+async function viewCalendar(){
+ setActive('/calendar');
+ let ch=[];try{ch=await api('/api/channels')}catch{}
+ app.innerHTML='<div class="h1">Calendario</div><p class="sub">Publicado y planificado por canal.</p>'+
+  '<div class="card"><select id="cal">'+ch.map(c=>'<option>'+esc(c.id)+'</option>').join('')+'</select><div id="cal_body" style="margin-top:14px"></div></div>';
+ const load=async id=>{
+  const d=await api('/api/calendar?channel='+encodeURIComponent(id));
+  const cls=s=>s==='completed'?'ok':s==='failed'?'bad':'warn';
+  const pub=d.published.length?d.published.map(e=>'<span class="chip '+cls(e.status)+'" style="margin:3px"><span class=dot></span>'+esc(e.date)+'</span>').join(''):'<span class=muted>sin publicaciones</span>';
+  const plan=d.planned.length?d.planned.map(p=>'<tr><td>'+(p.usedDate?'<span class="chip ok">'+esc(p.usedDate)+'</span>':'<span class=pill>pendiente</span>')+'</td><td>'+esc(p.angle)+'</td></tr>').join(''):'<tr><td colspan=2 class=muted>backlog vacío — añade ideas con: factory backlog '+esc(id)+' --add "…"</td></tr>';
+  $('#cal_body').innerHTML='<h3>Publicado</h3><div class="row" style="flex-wrap:wrap">'+pub+'</div><h3 style="margin-top:16px">Planificado (backlog)</h3><table><tbody>'+plan+'</tbody></table>';
+ };
+ $('#cal').onchange=()=>load($('#cal').value);
+ if(ch[0])load(ch[0].id);
+}
 function router(){
  const h=location.hash.replace('#','')||'/';
  if(h==='/')return viewHome();
  if(h==='/create')return viewCreate();
  if(h==='/channels')return viewChannels();
  if(h.startsWith('/channel/'))return viewChannel(decodeURIComponent(h.slice('/channel/'.length)));
+ if(h==='/library')return viewLibrary();
+ if(h==='/calendar')return viewCalendar();
  if(h==='/setup')return viewSetup();
  viewHome();
 }

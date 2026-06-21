@@ -313,6 +313,17 @@ Loudness fuera de objetivo y duración por debajo de banda son *warnings*, no bl
 - **Caché de LLM:** respuestas idénticas (system+user) se sirven de disco — ahorra tiempo y
   coste en re-ejecuciones (desactiva con `FACTORY_LLM_CACHE=0`).
 - **Paralelismo:** voz y subtítulos se generan en paralelo por formato (con límite).
+- **Caché global de voz:** narraciones idénticas se reutilizan entre runs **y canales** (no se
+  re-sintetizan; `out/_db/cache/voice`).
+- **Rate-limit / backoff:** las llamadas a proveedores reintentan con backoff exponencial +
+  jitter en 429/5xx (honra `Retry-After`).
+- **Biblioteca + buscador:** página **Biblioteca** en la UI (y `/api/library?q=`) busca en todo
+  el contenido generado.
+- **Calendario editorial:** página **Calendario** (y `/api/calendar`) muestra publicado +
+  backlog planificado por canal.
+- **Regeneración con variantes:** `factory regenerate <canal> <fecha> --style X --voice Y --reroll`
+  rehace una pieza con otro estilo/voz/ángulo (queda como nueva versión en el historial).
+- **Dedup difuso:** además del exacto, el QA detecta titulares **muy similares** (Jaccard).
 
 ## Crecimiento, ingresos y operación
 

@@ -16,6 +16,7 @@ import { getLlmClient } from "../../engine/llm/client.js";
 interface GenerativeConfig {
   angles?: string[];
   require_sources?: boolean;
+  rerollSeed?: number;
   trends?: { enabled?: boolean; source?: "google" | "reddit"; geo?: string };
 }
 
@@ -58,9 +59,11 @@ function buildUser(ctx: RunContext, seed: GenSeed): string {
 
 function pickAngle(cfg: GenerativeConfig, ctx: RunContext, date: string): string {
   const angles = cfg.angles ?? [];
-  if (angles.length > 0) return angles[dayIndex(date) % angles.length]!;
+  const seed = cfg.rerollSeed ?? 0;
+  if (angles.length > 0) return angles[(dayIndex(date) + seed) % angles.length]!;
   // No explicit list → let the model choose a fresh angle from the topic itself.
-  return `un aspecto interesante y poco conocido de "${ctx.channel.niche.topic}"`;
+  const variant = seed > 0 ? ` (enfoque alternativo #${seed})` : "";
+  return `un aspecto interesante y poco conocido de "${ctx.channel.niche.topic}"${variant}`;
 }
 
 function fallbackPayload(ctx: RunContext, seed: GenSeed): ContentPayload {

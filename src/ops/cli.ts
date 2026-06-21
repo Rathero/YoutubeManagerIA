@@ -248,6 +248,25 @@ program
   });
 
 program
+  .command("regenerate")
+  .description("Re-make a piece with a different style/voice/angle (new version)")
+  .argument("<channel>", "channel id or path")
+  .argument("<date>", "target date (YYYY-MM-DD)")
+  .option("--style <style>", "override visual style")
+  .option("--voice <provider>", "override voice provider")
+  .option("--reroll", "force a different generative angle", false)
+  .option("--dry-run", "don't publish", false)
+  .action(async (channel: string, date: string, opts: { style?: string; voice?: string; reroll?: boolean; dryRun?: boolean }) => {
+    const def = JSON.parse(JSON.stringify(await loadChannelDefinition(resolveConfig(channel))));
+    if (opts.style && def.video) def.video.style = opts.style;
+    if (opts.voice) def.voice.provider = opts.voice;
+    if (opts.reroll) def.data.config = { ...(def.data.config ?? {}), rerollSeed: Math.floor(Math.random() * 1000) + 1 };
+    const outcome = await runChannel(def, { date, dryRun: opts.dryRun });
+    console.log(`Regenerado ${def.id} ${date} — ${outcome.status}`);
+    if (outcome.status === "completed") console.log(`  nuevo titular: ${outcome.ctx.payload?.headlineFact}`);
+  });
+
+program
   .command("run-all")
   .description("Run one cycle for every active channel (bulk)")
   .option("-d, --date <iso>", "target date (YYYY-MM-DD)")

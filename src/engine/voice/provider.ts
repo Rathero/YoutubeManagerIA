@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import type { VoiceConfig } from "../../core/types/index.js";
 
 const pexec = promisify(exec);
+import { resilientFetch } from "../../core/util/fetch.js";
 
 export interface TtsRequest {
   text: string;
@@ -105,7 +106,7 @@ export class ElevenLabsProvider implements TtsProvider {
     const voiceId = this.cfg.voice_id!;
     const model = this.cfg.model_id ?? "eleven_v3";
     const path = req.outPath.replace(/\.[^.]+$/, ".mp3");
-    const res = await fetch(
+    const res = await resilientFetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
       {
         method: "POST",
@@ -140,7 +141,7 @@ export class OpenAITtsProvider implements TtsProvider {
   }
   async synthesize(req: TtsRequest): Promise<TtsResult> {
     const path = req.outPath.replace(/\.[^.]+$/, ".mp3");
-    const res = await fetch(`${this.base}/audio/speech`, {
+    const res = await resilientFetch(`${this.base}/audio/speech`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.key}` },
       body: JSON.stringify({
@@ -171,7 +172,7 @@ export class GoogleTtsProvider implements TtsProvider {
   async synthesize(req: TtsRequest): Promise<TtsResult> {
     const model = this.cfg.model_id ?? "gemini-2.5-flash-preview-tts";
     const path = req.outPath.replace(/\.[^.]+$/, ".wav");
-    const res = await fetch(`${this.base}/models/${model}:generateContent`, {
+    const res = await resilientFetch(`${this.base}/models/${model}:generateContent`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": this.key },
       body: JSON.stringify({
@@ -203,7 +204,7 @@ export class LocalTtsProvider implements TtsProvider {
   async synthesize(req: TtsRequest): Promise<TtsResult> {
     const path = req.outPath.replace(/\.[^.]+$/, ".mp3");
     const base = this.cfg.base ?? this.base;
-    const res = await fetch(`${base}/audio/speech`, {
+    const res = await resilientFetch(`${base}/audio/speech`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer local" },
       body: JSON.stringify({

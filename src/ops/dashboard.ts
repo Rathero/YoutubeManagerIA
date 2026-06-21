@@ -115,6 +115,15 @@ export function startDashboard(port = 8787): ReturnType<typeof createServer> {
       }
       if (path === "/api/channels" && req.method === "GET") return send(res, 200, await listChannels());
 
+      if (path === "/api/library") {
+        const { searchLibrary } = await import("../storage/library.js");
+        return send(res, 200, await searchLibrary(url.searchParams.get("q") ?? "", 150));
+      }
+      if (path === "/api/calendar") {
+        const { calendarFor } = await import("../storage/calendar.js");
+        return send(res, 200, await calendarFor(url.searchParams.get("channel") ?? ""));
+      }
+
       if (path === "/api/recommend") {
         const topic = url.searchParams.get("topic") ?? "";
         const local = url.searchParams.get("local") === "true";

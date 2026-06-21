@@ -194,9 +194,18 @@ async function viewChannel(id){
   catch(e){alert('Error: '+e.message);ev.target.disabled=false;ev.target.textContent='▶ Probar (dry-run)'}};
 }
 
-const CW={topic:'',language:'es-ES',region:'ES',local:false,rec:null};
+const CW={topic:'',language:'es-ES',region:'ES',local:false,rec:null,hw:null};
 async function viewCreate(){
  setActive('/create');
+ try{CW.hw=await api('/api/hardware')}catch{}
+ const hw=CW.hw;
+ const canLocal=hw&&(hw.rec.image!=='cloud-only'||hw.rec.localLLM!=='cloud-only');
+ const imgModel=hw?(hw.rec.image==='cloud-only'?null:hw.rec.image):null;
+ if(hw&&CW.local===false&&CW.rec===null)CW.local=!!canLocal; // sugerencia inicial según equipo
+ const hwHint=hw?(canLocal
+   ? '<span class="chip ok"><span class=dot></span>Tu equipo puede con local ($0)</span> '+(imgModel?'<span class="chip"><span class=dot></span>imagen: '+imgModel+'</span>':'')
+   : '<span class="chip warn"><span class=dot></span>Recomendado: nube (sin GPU potente)</span>')
+   :'';
  app.innerHTML=\`
   <div class="h1">Crear un canal</div><p class="sub">Sin código. En 2 pasos: describe y confirma.</p>
   <div class="steps"><div class="s on" id="st1"></div><div class="s" id="st2"></div></div>
@@ -208,7 +217,9 @@ async function viewCreate(){
     <div style="flex:1"><label>Idioma</label><input id="lang" value="\${CW.language}"/></div>
     <div style="flex:1"><label>Región</label><input id="region" value="\${CW.region}"/></div>
    </div>
-   <label class="toggle" style="margin-top:14px"><input type="checkbox" id="local" \${CW.local?'checked':''}/> <span>Modo 100% local ($0) — Ollama + Kokoro + ComfyUI</span></label>
+   <label>Calidad / coste</label>
+   <label class="toggle"><input type="checkbox" id="local" \${CW.local?'checked':''}/> <span>Modo 100% local ($0) — Ollama + Kokoro + ComfyUI</span></label>
+   <p class="hint">\${hwHint||'Sin marcar = nube (máxima calidad, de pago). Marcado = gratis, corre en tu equipo.'}</p>
    <div style="margin-top:18px"><button class="btn primary" id="analyze">Analizar temática →</button></div>
   </div>\`;
  $('#analyze').onclick=async()=>{
@@ -235,6 +246,7 @@ function renderReco(){
     <div class="item"><div class="l">Modo vídeo</div><div class="v">\${esc(r.videoMode)}</div></div>
     \${r.videoMode!=='data_card'?'<div class="item"><div class="l">Modelo de vídeo</div><select id="r_vid">'+vidOpts+'</select></div>':''}
     <div class="item"><div class="l">Voz</div><select id="r_voice">\${voiceOpts}</select></div>
+    \${CW.local&&CW.hw?'<div class="item"><div class="l">Imagen (local, según tu GPU)</div><div class="v">'+(CW.hw.rec.image==='cloud-only'?'⚠ tu GPU es justa → mejor nube':CW.hw.rec.image)+'</div></div>':''}
    </div>
    <p class="hint">\${esc(r.styleRationale||'')}</p>
    <div class="row" style="margin-top:8px">
